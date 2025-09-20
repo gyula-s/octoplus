@@ -131,9 +131,10 @@
     },
     "serviceRawFile": "service: octoplus-benefits\n\nprovider:\n  name: aws\n  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda\n  region: eu-west-1  # Ireland region - change if needed\n  stage: ${opt:stage, 'dev'}  # Default to 'dev' stage\n  timeout: 30\n  memorySize: 128\n  logRetentionInDays: 14  # Keep logs for 2 weeks\n  environment:\n    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}\n    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n            - logs:DescribeLogGroups\n            - logs:DescribeLogStreams\n          Resource: \"*\"\n\nfunctions:\n  caffenero:\n    handler: dist/lambda.handler\n    name: ${self:service}-${self:provider.stage}-caffenero\n    description: \"Automated Caffe Nero benefit claiming for Octoplus\"\n    timeout: 30\n    memorySize: 128\n    logRetentionInDays: 14\n    events:\n      - schedule:\n          name: ${self:service}-${self:provider.stage}-caffenero-schedule\n          description: \"Run every 10 minutes between 5-6:30 AM on Mondays\"\n          rate: cron(0/10 5-6 ? * MON *)\n          enabled: true\n\nresources:\n  Outputs:\n    LambdaFunctionName:\n      Description: \"Lambda Function Name\"\n      Value: ${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-function-name\n    \n    LogGroupName:\n      Description: \"CloudWatch Log Group for Lambda\"\n      Value: /aws/lambda/${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-log-group\n\npackage:\n  patterns:\n    - 'dist/**'\n    - 'node_modules/**'\n    - '!src/**'\n    - '!*.ts'\n    - '!queries/*.ts'\n    - '!.env'\n  excludeDevDependencies: true",
     "command": [
-      "invoke"
+      "logs"
     ],
     "options": {
+      "startTime": "5m",
       "function": "caffenero"
     },
     "orgId": "a9a299a8-ca8e-4edc-8b39-7dcb4b578979",
