@@ -7,6 +7,7 @@ provider:
   stage: ${opt:stage, 'dev'}  # Default to 'dev' stage
   timeout: 30
   memorySize: 128
+  logRetentionInDays: 14  # Keep logs for 2 weeks
   environment:
     OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}
     OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}
@@ -18,6 +19,8 @@ provider:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
           Resource: "*"
 
 functions:
@@ -27,12 +30,40 @@ functions:
     description: "Automated Caffe Nero benefit claiming for Octoplus"
     timeout: 30
     memorySize: 128
+    logRetentionInDays: 14
     events:
       - schedule:
           name: ${self:service}-${self:provider.stage}-caffenero-schedule
           description: "Run every 10 minutes between 5-6:30 AM on Mondays"
           rate: cron(0/10 5-6 ? * MON *)
           enabled: true
+
+resources:
+  Resources:
+    CaffeNeroLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-caffenero
+        RetentionInDays: 14
+    
+    CaffeNeroScheduleLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/events/rule/${self:service}-${self:provider.stage}-caffenero-schedule
+        RetentionInDays: 14
+
+  Outputs:
+    CaffeNeroLogGroupName:
+      Description: "CloudWatch Log Group for Caffe Nero Lambda"
+      Value: !Ref CaffeNeroLogGroup
+      Export:
+        Name: ${self:service}-${self:provider.stage}-log-group
+    
+    LambdaFunctionName:
+      Description: "Lambda Function Name"
+      Value: ${self:service}-${self:provider.stage}-caffenero
+      Export:
+        Name: ${self:service}-${self:provider.stage}-function-name
 
 package:
   patterns:
