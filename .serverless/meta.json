@@ -14,8 +14,14 @@
         "memorySize": 128,
         "logRetentionInDays": 14,
         "environment": {
+          "OCTOPUS_API_KEY_1": "<REDACTED>",
+          "OCTOPUS_ACCOUNT_NUMBER_1": "A-4FB4AE60",
+          "OCTOPUS_API_KEY_2": "<REDACTED>",
+          "OCTOPUS_ACCOUNT_NUMBER_2": "A-36CCCCC0",
+          "OCTOPUS_API_KEY_3": "<REDACTED>",
+          "OCTOPUS_ACCOUNT_NUMBER_3": "",
           "OCTOPUS_API_KEY": "<REDACTED>",
-          "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+          "OCTOPUS_ACCOUNT_NUMBER": ""
         },
         "iam": {
           "role": {
@@ -98,8 +104,14 @@
       "memorySize": 128,
       "logRetentionInDays": 14,
       "environment": {
+        "OCTOPUS_API_KEY_1": "<REDACTED>",
+        "OCTOPUS_ACCOUNT_NUMBER_1": "A-4FB4AE60",
+        "OCTOPUS_API_KEY_2": "<REDACTED>",
+        "OCTOPUS_ACCOUNT_NUMBER_2": "A-36CCCCC0",
+        "OCTOPUS_API_KEY_3": "<REDACTED>",
+        "OCTOPUS_ACCOUNT_NUMBER_3": "",
         "OCTOPUS_API_KEY": "<REDACTED>",
-        "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+        "OCTOPUS_ACCOUNT_NUMBER": ""
       },
       "iam": {
         "role": {
@@ -129,12 +141,11 @@
       "serviceProvider": null,
       "instanceParameters": null
     },
-    "serviceRawFile": "service: octoplus-benefits\n\nprovider:\n  name: aws\n  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda\n  region: eu-west-1  # Ireland region - change if needed\n  stage: ${opt:stage, 'dev'}  # Default to 'dev' stage\n  timeout: 30\n  memorySize: 128\n  logRetentionInDays: 14  # Keep logs for 2 weeks\n  environment:\n    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}\n    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n            - logs:DescribeLogGroups\n            - logs:DescribeLogStreams\n          Resource: \"*\"\n\nfunctions:\n  caffenero:\n    handler: dist/lambda.handler\n    name: ${self:service}-${self:provider.stage}-caffenero\n    description: \"Automated Caffe Nero benefit claiming for Octoplus\"\n    timeout: 30\n    memorySize: 128\n    logRetentionInDays: 14\n    events:\n      - schedule:\n          name: ${self:service}-${self:provider.stage}-caffenero-schedule\n          description: \"Run every 10 minutes between 5-6:30 AM on Mondays\"\n          rate: cron(0/10 5-6 ? * MON *)\n          enabled: true\n\nresources:\n  Outputs:\n    LambdaFunctionName:\n      Description: \"Lambda Function Name\"\n      Value: ${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-function-name\n    \n    LogGroupName:\n      Description: \"CloudWatch Log Group for Lambda\"\n      Value: /aws/lambda/${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-log-group\n\npackage:\n  patterns:\n    - 'dist/**'\n    - 'node_modules/**'\n    - '!src/**'\n    - '!*.ts'\n    - '!queries/*.ts'\n    - '!.env'\n  excludeDevDependencies: true",
+    "serviceRawFile": "service: octoplus-benefits\n\nprovider:\n  name: aws\n  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda\n  region: eu-west-1  # Ireland region - change if needed\n  stage: ${opt:stage, 'dev'}  # Default to 'dev' stage\n  timeout: 30\n  memorySize: 128\n  logRetentionInDays: 14  # Keep logs for 2 weeks\n  environment:\n    # Support for multiple accounts (numbered format)\n    OCTOPUS_API_KEY_1: ${env:OCTOPUS_API_KEY_1, ''}\n    OCTOPUS_ACCOUNT_NUMBER_1: ${env:OCTOPUS_ACCOUNT_NUMBER_1, ''}\n    OCTOPUS_API_KEY_2: ${env:OCTOPUS_API_KEY_2, ''}\n    OCTOPUS_ACCOUNT_NUMBER_2: ${env:OCTOPUS_ACCOUNT_NUMBER_2, ''}\n    OCTOPUS_API_KEY_3: ${env:OCTOPUS_API_KEY_3, ''}\n    OCTOPUS_ACCOUNT_NUMBER_3: ${env:OCTOPUS_ACCOUNT_NUMBER_3, ''}\n    # Legacy support (for backward compatibility)\n    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY, ''}\n    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER, ''}\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n            - logs:DescribeLogGroups\n            - logs:DescribeLogStreams\n          Resource: \"*\"\n\nfunctions:\n  caffenero:\n    handler: dist/lambda.handler\n    name: ${self:service}-${self:provider.stage}-caffenero\n    description: \"Automated Caffe Nero benefit claiming for Octoplus\"\n    timeout: 30\n    memorySize: 128\n    logRetentionInDays: 14\n    events:\n      - schedule:\n          name: ${self:service}-${self:provider.stage}-caffenero-schedule\n          description: \"Run every 10 minutes between 5-6:30 AM on Mondays\"\n          rate: cron(0/10 5-6 ? * MON *)\n          enabled: true\n\nresources:\n  Outputs:\n    LambdaFunctionName:\n      Description: \"Lambda Function Name\"\n      Value: ${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-function-name\n    \n    LogGroupName:\n      Description: \"CloudWatch Log Group for Lambda\"\n      Value: /aws/lambda/${self:service}-${self:provider.stage}-caffenero\n      Export:\n        Name: ${self:service}-${self:provider.stage}-log-group\n\npackage:\n  patterns:\n    - 'dist/**'\n    - 'node_modules/**'\n    - '!src/**'\n    - '!*.ts'\n    - '!queries/*.ts'\n    - '!.env'\n  excludeDevDependencies: true",
     "command": [
-      "logs"
+      "invoke"
     ],
     "options": {
-      "startTime": "5m",
       "function": "caffenero"
     },
     "orgId": "a9a299a8-ca8e-4edc-8b39-7dcb4b578979",
@@ -145,12 +156,12 @@
     "serviceProviderAwsCfStackName": "octoplus-benefits-dev",
     "serviceProviderAwsCfStackId": "arn:aws:cloudformation:eu-west-1:269825205789:stack/octoplus-benefits-dev/cbae12f0-966d-11f0-b50a-02e62a317287",
     "serviceProviderAwsCfStackCreated": "2025-09-20T22:04:36.433Z",
-    "serviceProviderAwsCfStackUpdated": "2025-09-20T22:17:04.384Z",
+    "serviceProviderAwsCfStackUpdated": "2025-09-20T22:25:59.725Z",
     "serviceProviderAwsCfStackStatus": "UPDATE_COMPLETE",
     "serviceProviderAwsCfStackOutputs": [
       {
         "OutputKey": "CaffeneroLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:eu-west-1:269825205789:function:octoplus-benefits-dev-caffenero:3",
+        "OutputValue": "arn:aws:lambda:eu-west-1:269825205789:function:octoplus-benefits-dev-caffenero:4",
         "Description": "Current Lambda function version",
         "ExportName": "sls-octoplus-benefits-dev-CaffeneroLambdaFunctionQualifiedArn"
       },

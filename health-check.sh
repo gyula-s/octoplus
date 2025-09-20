@@ -46,16 +46,37 @@ echo ""
 if [ -f ".env" ]; then
     echo "✅ .env file: Exists"
     
+    # Check for accounts
+    account_count=0
+    
+    # Check numbered accounts
+    for i in {1..5}; do
+        api_key_var="OCTOPUS_API_KEY_$i"
+        account_var="OCTOPUS_ACCOUNT_NUMBER_$i"
+        
+        if grep -q "$api_key_var=" .env && ! grep -q "$api_key_var=your_.*_api_key_here" .env; then
+            if grep -q "$account_var=" .env && ! grep -q "$account_var=A-.*XXXX" .env; then
+                account_count=$((account_count + 1))
+                echo "✅ Account $i: Configured"
+            fi
+        fi
+    done
+    
+    # Check legacy format
     if grep -q "OCTOPUS_API_KEY=" .env && ! grep -q "OCTOPUS_API_KEY=your_api_key_here" .env; then
-        echo "✅ OCTOPUS_API_KEY: Set"
-    else
-        echo "❌ OCTOPUS_API_KEY: Missing or using placeholder value"
+        if grep -q "OCTOPUS_ACCOUNT_NUMBER=" .env && ! grep -q "OCTOPUS_ACCOUNT_NUMBER=A-XXXXXXXX" .env; then
+            if [ $account_count -eq 0 ]; then
+                account_count=1
+                echo "✅ Legacy Account: Configured"
+            fi
+        fi
     fi
     
-    if grep -q "OCTOPUS_ACCOUNT_NUMBER=" .env && ! grep -q "OCTOPUS_ACCOUNT_NUMBER=A-XXXXXXXX" .env; then
-        echo "✅ OCTOPUS_ACCOUNT_NUMBER: Set"
+    if [ $account_count -eq 0 ]; then
+        echo "❌ No Octopus accounts configured"
+        echo "💡 Configure at least one account in .env file"
     else
-        echo "❌ OCTOPUS_ACCOUNT_NUMBER: Missing or using placeholder value"
+        echo "✅ Total accounts configured: $account_count"
     fi
 else
     echo "❌ .env file: Missing"

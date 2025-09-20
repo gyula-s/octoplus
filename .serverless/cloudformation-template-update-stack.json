@@ -103,7 +103,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-18755026-1cca",
-          "S3Key": "serverless/octoplus-benefits/dev/1758406621632-2025-09-20T22:17:01.632Z/octoplus-benefits.zip"
+          "S3Key": "serverless/octoplus-benefits/dev/1758407157046-2025-09-20T22:25:57.046Z/octoplus-benefits.zip"
         },
         "Handler": "dist/lambda.handler",
         "Runtime": "nodejs20.x",
@@ -113,8 +113,14 @@
         "Description": "Automated Caffe Nero benefit claiming for Octoplus",
         "Environment": {
           "Variables": {
-            "OCTOPUS_API_KEY": "sk_live_7HTsxeLcNtDGH6ZArqSKDDk8",
-            "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+            "OCTOPUS_API_KEY_1": "sk_live_7HTsxeLcNtDGH6ZArqSKDDk8",
+            "OCTOPUS_ACCOUNT_NUMBER_1": "A-4FB4AE60",
+            "OCTOPUS_API_KEY_2": "sk_live_6CwNf76uUynZHbeY7OrxUviuzxNLA4qf",
+            "OCTOPUS_ACCOUNT_NUMBER_2": "A-36CCCCC0",
+            "OCTOPUS_API_KEY_3": "",
+            "OCTOPUS_ACCOUNT_NUMBER_3": "",
+            "OCTOPUS_API_KEY": "",
+            "OCTOPUS_ACCOUNT_NUMBER": ""
           }
         },
         "Role": {
@@ -128,14 +134,14 @@
         "CaffeneroLogGroup"
       ]
     },
-    "CaffeneroLambdaVersionjNc0sC5oJwTikqPwW7wwlIA5wDLU7TSB5iCAB0": {
+    "CaffeneroLambdaVersionIJXjeYOisEnRbDMGUexyBna2eEsbp79z88PSD5CTRA": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "CaffeneroLambdaFunction"
         },
-        "CodeSha256": "vV17ZocV0GuJsgSrpJQDFQMvxQQi2Rm/BKbRgpL47eE=",
+        "CodeSha256": "hpGs+rB17oWLO4luvdfrAu34uAwnbSk8eOnp67j1SM8=",
         "Description": "Automated Caffe Nero benefit claiming for Octoplus"
       }
     },
@@ -189,7 +195,7 @@
     "CaffeneroLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "CaffeneroLambdaVersionjNc0sC5oJwTikqPwW7wwlIA5wDLU7TSB5iCAB0"
+        "Ref": "CaffeneroLambdaVersionIJXjeYOisEnRbDMGUexyBna2eEsbp79z88PSD5CTRA"
       },
       "Export": {
         "Name": "sls-octoplus-benefits-dev-CaffeneroLambdaFunctionQualifiedArn"

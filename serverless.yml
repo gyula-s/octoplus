@@ -9,8 +9,16 @@ provider:
   memorySize: 128
   logRetentionInDays: 14  # Keep logs for 2 weeks
   environment:
-    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}
-    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}
+    # Support for multiple accounts (numbered format)
+    OCTOPUS_API_KEY_1: ${env:OCTOPUS_API_KEY_1, ''}
+    OCTOPUS_ACCOUNT_NUMBER_1: ${env:OCTOPUS_ACCOUNT_NUMBER_1, ''}
+    OCTOPUS_API_KEY_2: ${env:OCTOPUS_API_KEY_2, ''}
+    OCTOPUS_ACCOUNT_NUMBER_2: ${env:OCTOPUS_ACCOUNT_NUMBER_2, ''}
+    OCTOPUS_API_KEY_3: ${env:OCTOPUS_API_KEY_3, ''}
+    OCTOPUS_ACCOUNT_NUMBER_3: ${env:OCTOPUS_ACCOUNT_NUMBER_3, ''}
+    # Legacy support (for backward compatibility)
+    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY, ''}
+    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER, ''}
   iam:
     role:
       statements:

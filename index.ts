@@ -2,11 +2,12 @@ import { executeGraphQLQuery } from './graphql';
 import { getBenefitsList, BenefitsResponse } from './queries/octoplusBenefits';
 import { claimBenefit, ClaimRewardResponse } from './queries/claimBenefit';
 import { getAllClaimedOffers, ClaimedOfferResponse } from './queries/getClaimedOffer';
+import { loadOctopusAccounts, validateAccounts, OctopusAccount } from './accounts';
 
-async function getClaimedOfferBySlug(offerSlug: string) {
+async function getClaimedOfferBySlug(account: OctopusAccount, offerSlug: string) {
     try {
         // Get all claimed offers and filter by slug
-        const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(getAllClaimedOffers);
+        const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
 
         console.log('Successfully fetched all claimed offers, searching for:', offerSlug);
         
@@ -40,15 +41,15 @@ async function getClaimedOfferBySlug(offerSlug: string) {
     }
 }
 
-export async function manageCaffeNeroBenefit() {
+export async function manageCaffeNeroBenefitForAccount(account: OctopusAccount) {
     const targetSlug = 'caffe-nero';
     
     try {
-        console.log('🔍 Checking Caffe Nero benefit status...\n');
+        console.log(`🔍 Checking Caffe Nero benefit status for ${account.name}...\n`);
         
         // Step 1: Get available benefits
         console.log('1️⃣ Fetching available benefits...');
-        const benefitsData: BenefitsResponse = await executeGraphQLQuery(getBenefitsList);
+        const benefitsData: BenefitsResponse = await executeGraphQLQuery(account, getBenefitsList);
         
         // Find Caffe Nero in the benefits list
         let caffeNeroOffer = null;
@@ -74,6 +75,7 @@ export async function manageCaffeNeroBenefit() {
             console.log('2️⃣ Benefit is claimable! Attempting to claim...');
             
             const claimResponse: ClaimRewardResponse = await executeGraphQLQuery(
+                account,
                 claimBenefit,
                 { offerSlug: targetSlug }
             );
@@ -83,13 +85,13 @@ export async function manageCaffeNeroBenefit() {
             
             // Get the voucher details for the newly claimed benefit
             console.log('3️⃣ Fetching voucher details...');
-            await getClaimedOfferBySlug(targetSlug);
+            await getClaimedOfferBySlug(account, targetSlug);
             
         } else {
             // Step 3: Check if already claimed
             console.log('2️⃣ Benefit not claimable. Checking if already claimed...');
             
-            const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(getAllClaimedOffers);
+            const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
             
             const existingClaim = allClaimedOffers.octoplusRewards.find(
                 reward => reward.offer.slug === targetSlug
@@ -121,9 +123,46 @@ export async function manageCaffeNeroBenefit() {
         }
         
     } catch (error) {
-        console.error('❌ Error managing Caffe Nero benefit:', error);
+        console.error(`❌ Error managing Caffe Nero benefit for ${account.name}:`, error);
     }
 }
 
-// Run the main logic
-manageCaffeNeroBenefit();
+/**
+ * Main function that processes Caffe Nero benefits for all configured accounts
+ */
+export async function manageCaffeNeroBenefit() {
+    try {
+        // Load and validate all configured accounts
+        const accounts = loadOctopusAccounts();
+        validateAccounts(accounts);
+        
+        console.log(`🚀 Starting Caffe Nero benefit processing for ${accounts.length} account(s)...\n`);
+        
+        // Process each account sequentially
+        for (let i = 0; i < accounts.length; i++) {
+            const account = accounts[i];
+            
+            console.log(`📋 Processing ${account.name} (${i + 1}/${accounts.length})`);
+            console.log(`🔑 Account: ${account.accountNumber}`);
+            console.log('─'.repeat(50));
+            
+            await manageCaffeNeroBenefitForAccount(account);
+            
+            // Add separator between accounts (except for the last one)
+            if (i < accounts.length - 1) {
+                console.log('\n' + '═'.repeat(60) + '\n');
+            }
+        }
+        
+        console.log(`\n🎉 Completed processing all ${accounts.length} account(s)!`);
+        
+    } catch (error) {
+        console.error('❌ Error in multi-account processing:', error);
+        throw error;
+    }
+}
+
+// Run the main logic when this file is executed directly
+if (require.main === module) {
+    manageCaffeNeroBenefit();
+}

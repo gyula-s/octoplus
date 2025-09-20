@@ -1,13 +1,8 @@
 import { getToken } from './auth';
+import { OctopusAccount } from './accounts';
 
 // Constants
 const GRAPHQL_ENDPOINT = 'https://api.octopus.energy/v1/graphql/';
-const OCTOPUS_ACCOUNT_NUMBER = process.env.OCTOPUS_ACCOUNT_NUMBER;
-
-// Validate required environment variables
-if (!OCTOPUS_ACCOUNT_NUMBER) {
-    throw new Error('OCTOPUS_ACCOUNT_NUMBER environment variable is required. Please add it to your .env file.');
-}
 
 interface GraphQLVariables {
     [key: string]: any;
@@ -40,15 +35,16 @@ interface GraphQLResponse {
 export async function makeGraphQLRequest(
     operationName: string,
     query: string,
+    account: OctopusAccount,
     additionalVariables: GraphQLVariables = {}
 ): Promise<GraphQLResponse> {
     try {
-        // Get authentication token
-        const token = await getToken();
+        // Get authentication token for this account
+        const token = await getToken(account);
         
         // Prepare the request body with default variables
         const variables = {
-            accountNumber: OCTOPUS_ACCOUNT_NUMBER,
+            accountNumber: account.accountNumber,
             ...additionalVariables
         };
 
@@ -91,12 +87,14 @@ export async function makeGraphQLRequest(
 /**
  * Convenience function for making GraphQL queries that expect a successful response
  * Throws an error if the request fails or returns errors
+ * @param account The Octopus account to use for authentication
  * @param queryObjectOrOperationName Either a query object with {operation, query, variables} or an operation name string
  * @param queryOrVariables Either the GraphQL query string (if first param is string) or additional variables (if first param is object)
  * @param additionalVariables Additional variables (only used when first param is string)
  * @returns The response data (without the 'data' wrapper)
  */
 export async function executeGraphQLQuery(
+    account: OctopusAccount,
     queryObjectOrOperationName: GraphQLQueryObject | string,
     queryOrVariables?: string | GraphQLVariables,
     additionalVariables: GraphQLVariables = {}
@@ -121,6 +119,6 @@ export async function executeGraphQLQuery(
         variables = additionalVariables;
     }
 
-    const response = await makeGraphQLRequest(operationName, query, variables);
+    const response = await makeGraphQLRequest(operationName, query, account, variables);
     return response.data;
 }

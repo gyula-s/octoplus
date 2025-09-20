@@ -1,26 +1,22 @@
 // auth.ts
 import dotenv from 'dotenv';
+import { OctopusAccount } from './accounts';
 
 // Initialize dotenv to load environment variables
 dotenv.config();
 
-// Get API key from environment variables
-const OCTOPUS_API_KEY = process.env.OCTOPUS_API_KEY;
 const GRAPHQL_ENDPOINT = 'https://api.octopus.energy/v1/graphql/';
 
 /**
- * Get authentication token from Octopus Energy API
+ * Get authentication token from Octopus Energy API for a specific account
+ * @param account - The Octopus account to authenticate
  * @returns Promise with the authentication token
  */
-export async function getToken(): Promise<string> {
-  if (!OCTOPUS_API_KEY) {
-    throw new Error('OCTOPUS_API_KEY environment variable is not defined');
-  }
-
+export async function getToken(account: OctopusAccount): Promise<string> {
   const tokenMutation = `
     mutation {
       obtainKrakenToken(input: {
-        APIKey: "${OCTOPUS_API_KEY}"
+        APIKey: "${account.apiKey}"
       }) {
         token
       }

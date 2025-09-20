@@ -23,9 +23,28 @@ if [ ! -f ".env" ]; then
 fi
 
 # Check if required environment variables are set
-if ! grep -q "OCTOPUS_API_KEY=" .env || ! grep -q "OCTOPUS_ACCOUNT_NUMBER=" .env; then
-    echo "❌ Error: Missing required environment variables in .env file"
-    echo "Required: OCTOPUS_API_KEY and OCTOPUS_ACCOUNT_NUMBER"
+account_found=false
+
+# Check for numbered accounts
+for i in {1..5}; do
+    if grep -q "OCTOPUS_API_KEY_$i=" .env && grep -q "OCTOPUS_ACCOUNT_NUMBER_$i=" .env; then
+        account_found=true
+        break
+    fi
+done
+
+# Check for legacy format if no numbered accounts found
+if [ "$account_found" = false ]; then
+    if grep -q "OCTOPUS_API_KEY=" .env && grep -q "OCTOPUS_ACCOUNT_NUMBER=" .env; then
+        account_found=true
+    fi
+fi
+
+if [ "$account_found" = false ]; then
+    echo "❌ Error: No Octopus accounts configured in .env file"
+    echo "Configure at least one account using either:"
+    echo "  • Numbered format: OCTOPUS_API_KEY_1= and OCTOPUS_ACCOUNT_NUMBER_1="
+    echo "  • Legacy format: OCTOPUS_API_KEY= and OCTOPUS_ACCOUNT_NUMBER="
     echo "See README.md for instructions."
     exit 1
 fi
