@@ -39,31 +39,18 @@ functions:
           enabled: true
 
 resources:
-  Resources:
-    CaffeNeroLogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-caffenero
-        RetentionInDays: 14
-    
-    CaffeNeroScheduleLogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: /aws/events/rule/${self:service}-${self:provider.stage}-caffenero-schedule
-        RetentionInDays: 14
-
   Outputs:
-    CaffeNeroLogGroupName:
-      Description: "CloudWatch Log Group for Caffe Nero Lambda"
-      Value: !Ref CaffeNeroLogGroup
-      Export:
-        Name: ${self:service}-${self:provider.stage}-log-group
-    
     LambdaFunctionName:
       Description: "Lambda Function Name"
       Value: ${self:service}-${self:provider.stage}-caffenero
       Export:
         Name: ${self:service}-${self:provider.stage}-function-name
+    
+    LogGroupName:
+      Description: "CloudWatch Log Group for Lambda"
+      Value: /aws/lambda/${self:service}-${self:provider.stage}-caffenero
+      Export:
+        Name: ${self:service}-${self:provider.stage}-log-group
 
 package:
   patterns:

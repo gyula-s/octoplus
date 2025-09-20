@@ -5,7 +5,8 @@
     "CaffeneroLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
-        "LogGroupName": "/aws/lambda/octoplus-benefits-dev-caffenero"
+        "LogGroupName": "/aws/lambda/octoplus-benefits-dev-caffenero",
+        "RetentionInDays": 14
       }
     },
     "IamRoleLambdaExecution": {
@@ -71,7 +72,9 @@
                   "Action": [
                     "logs:CreateLogGroup",
                     "logs:CreateLogStream",
-                    "logs:PutLogEvents"
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogGroups",
+                    "logs:DescribeLogStreams"
                   ],
                   "Resource": "*"
                 }
@@ -100,7 +103,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-18755026-1cca",
-          "S3Key": "serverless/octoplus-benefits/dev/1758406163501-2025-09-20T22:09:23.501Z/octoplus-benefits.zip"
+          "S3Key": "serverless/octoplus-benefits/dev/1758406621632-2025-09-20T22:17:01.632Z/octoplus-benefits.zip"
         },
         "Handler": "dist/lambda.handler",
         "Runtime": "nodejs20.x",
@@ -125,14 +128,14 @@
         "CaffeneroLogGroup"
       ]
     },
-    "CaffeneroLambdaVersionCDkCGxUEniz1qqEBbcAsK8jkdPDXNOsK2n66EwjPqA": {
+    "CaffeneroLambdaVersionjNc0sC5oJwTikqPwW7wwlIA5wDLU7TSB5iCAB0": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "CaffeneroLambdaFunction"
         },
-        "CodeSha256": "gn3cSVgPiF82iZ5Q8eloeFjw0MCa3DyxJYbKywCHe6o=",
+        "CodeSha256": "vV17ZocV0GuJsgSrpJQDFQMvxQQi2Rm/BKbRgpL47eE=",
         "Description": "Automated Caffe Nero benefit claiming for Octoplus"
       }
     },
@@ -186,10 +189,24 @@
     "CaffeneroLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "CaffeneroLambdaVersionCDkCGxUEniz1qqEBbcAsK8jkdPDXNOsK2n66EwjPqA"
+        "Ref": "CaffeneroLambdaVersionjNc0sC5oJwTikqPwW7wwlIA5wDLU7TSB5iCAB0"
       },
       "Export": {
         "Name": "sls-octoplus-benefits-dev-CaffeneroLambdaFunctionQualifiedArn"
+      }
+    },
+    "LambdaFunctionName": {
+      "Description": "Lambda Function Name",
+      "Value": "octoplus-benefits-dev-caffenero",
+      "Export": {
+        "Name": "octoplus-benefits-dev-function-name"
+      }
+    },
+    "LogGroupName": {
+      "Description": "CloudWatch Log Group for Lambda",
+      "Value": "/aws/lambda/octoplus-benefits-dev-caffenero",
+      "Export": {
+        "Name": "octoplus-benefits-dev-log-group"
       }
     }
   }
