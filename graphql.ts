@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { getToken } from './auth';
 
 // Constants

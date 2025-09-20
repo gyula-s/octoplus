@@ -1,0 +1,288 @@
+{
+  "service": {
+    "service": "octoplus-benefits",
+    "serviceObject": {
+      "name": "octoplus-benefits"
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "eu-west-1",
+      "stage": "dev",
+      "timeout": 30,
+      "memorySize": 128,
+      "environment": {
+        "OCTOPUS_API_KEY": "sk_live_7HTsxeLcNtDGH6ZArqSKDDk8",
+        "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+      },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      },
+      "versionFunctions": true,
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "CaffeneroLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/octoplus-benefits-dev-caffenero"
+            }
+          },
+          "IamRoleLambdaExecution": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        "octoplus-benefits",
+                        "dev",
+                        "lambda"
+                      ]
+                    ]
+                  },
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogStream",
+                          "logs:CreateLogGroup",
+                          "logs:TagResource"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/octoplus-benefits-dev*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/octoplus-benefits-dev*:*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "$ref": "$[\"service\"][\"provider\"][\"iam\"][\"role\"][\"statements\"][0]"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "Path": "/",
+              "RoleName": {
+                "Fn::Join": [
+                  "-",
+                  [
+                    "octoplus-benefits",
+                    "dev",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    "lambdaRole"
+                  ]
+                ]
+              }
+            }
+          },
+          "CaffeneroLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+              "Code": {
+                "S3Bucket": "serverless-framework-deployments-eu-west-1-18755026-1cca",
+                "S3Key": "serverless/octoplus-benefits/dev/1758406163501-2025-09-20T22:09:23.501Z/octoplus-benefits.zip"
+              },
+              "Handler": "dist/lambda.handler",
+              "Runtime": "nodejs20.x",
+              "FunctionName": "octoplus-benefits-dev-caffenero",
+              "MemorySize": 128,
+              "Timeout": 30,
+              "Description": "Automated Caffe Nero benefit claiming for Octoplus",
+              "Environment": {
+                "Variables": {
+                  "OCTOPUS_API_KEY": "sk_live_7HTsxeLcNtDGH6ZArqSKDDk8",
+                  "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+                }
+              },
+              "Role": {
+                "Fn::GetAtt": [
+                  "IamRoleLambdaExecution",
+                  "Arn"
+                ]
+              }
+            },
+            "DependsOn": [
+              "CaffeneroLogGroup"
+            ]
+          },
+          "CaffeneroLambdaVersionCDkCGxUEniz1qqEBbcAsK8jkdPDXNOsK2n66EwjPqA": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "CaffeneroLambdaFunction"
+              },
+              "CodeSha256": "gn3cSVgPiF82iZ5Q8eloeFjw0MCa3DyxJYbKywCHe6o=",
+              "Description": "Automated Caffe Nero benefit claiming for Octoplus"
+            }
+          },
+          "CaffeneroEventsRuleSchedule1": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+              "ScheduleExpression": "cron(0/10 5-6 ? * MON *)",
+              "State": "ENABLED",
+              "Name": "octoplus-benefits-dev-caffenero-schedule",
+              "Description": "Run every 10 minutes between 5-6:30 AM on Mondays",
+              "Targets": [
+                {
+                  "Arn": {
+                    "Fn::GetAtt": [
+                      "CaffeneroLambdaFunction",
+                      "Arn"
+                    ]
+                  },
+                  "Id": "caffeneroSchedule"
+                }
+              ]
+            }
+          },
+          "CaffeneroLambdaPermissionEventsRuleSchedule1": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+              "FunctionName": {
+                "Fn::GetAtt": [
+                  "CaffeneroLambdaFunction",
+                  "Arn"
+                ]
+              },
+              "Action": "lambda:InvokeFunction",
+              "Principal": "events.amazonaws.com",
+              "SourceArn": {
+                "Fn::GetAtt": [
+                  "CaffeneroEventsRuleSchedule1",
+                  "Arn"
+                ]
+              }
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "serverless-framework-deployments-eu-west-1-18755026-1cca",
+            "Export": {
+              "Name": "sls-octoplus-benefits-dev-ServerlessDeploymentBucketName"
+            }
+          },
+          "CaffeneroLambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "CaffeneroLambdaVersionCDkCGxUEniz1qqEBbcAsK8jkdPDXNOsK2n66EwjPqA"
+            },
+            "Export": {
+              "Name": "sls-octoplus-benefits-dev-CaffeneroLambdaFunctionQualifiedArn"
+            }
+          }
+        }
+      },
+      "vpc": {}
+    },
+    "pluginsData": {},
+    "functions": {
+      "caffenero": {
+        "handler": "dist/lambda.handler",
+        "name": "octoplus-benefits-dev-caffenero",
+        "description": "Automated Caffe Nero benefit claiming for Octoplus",
+        "timeout": 30,
+        "memorySize": 128,
+        "events": [
+          {
+            "schedule": {
+              "name": "octoplus-benefits-dev-caffenero-schedule",
+              "description": "Run every 10 minutes between 5-6:30 AM on Mondays",
+              "rate": [
+                "cron(0/10 5-6 ? * MON *)"
+              ],
+              "enabled": true
+            }
+          }
+        ],
+        "package": {},
+        "memory": 128,
+        "runtime": "nodejs20.x",
+        "vpc": {},
+        "versionLogicalId": "CaffeneroLambdaVersionCDkCGxUEniz1qqEBbcAsK8jkdPDXNOsK2n66EwjPqA"
+      }
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless",
+    "initialServerlessConfig": {
+      "service": "octoplus-benefits",
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "functions": {
+        "$ref": "$[\"service\"][\"functions\"]"
+      },
+      "package": {
+        "patterns": [
+          "dist/**",
+          "node_modules/**",
+          "!src/**",
+          "!*.ts",
+          "!queries/*.ts",
+          "!.env"
+        ],
+        "excludeDevDependencies": true,
+        "artifactsS3KeyDirname": "serverless/octoplus-benefits/dev/code-artifacts",
+        "deploymentBucket": "serverless-framework-deployments-eu-west-1-18755026-1cca",
+        "artifact": "/Users/vinczehajni/projects/octoplus/.serverless/octoplus-benefits.zip",
+        "artifactDirectoryName": "serverless/octoplus-benefits/dev/1758406163501-2025-09-20T22:09:23.501Z"
+      }
+    },
+    "appId": null,
+    "orgId": null,
+    "layers": {},
+    "artifact": "/Users/vinczehajni/projects/octoplus/.serverless/octoplus-benefits.zip"
+  },
+  "package": {
+    "artifactDirectoryName": "serverless/octoplus-benefits/dev/1758406163501-2025-09-20T22:09:23.501Z",
+    "artifact": "octoplus-benefits.zip"
+  }
+}

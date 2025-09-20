@@ -1,5 +1,4 @@
 // auth.ts
-import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 
 // Initialize dotenv to load environment variables
@@ -39,7 +38,7 @@ export async function getToken(): Promise<string> {
       })
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as any;
     
     if (tokenResponse.status >= 400 || tokenData.errors) {
       throw new Error(`Authentication failed: ${JSON.stringify(tokenData.errors || tokenData)}`);

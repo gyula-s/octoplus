@@ -2,8 +2,9 @@ service: octoplus-benefits
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda
   region: eu-west-1  # Ireland region - change if needed
+  stage: ${opt:stage, 'dev'}  # Default to 'dev' stage
   timeout: 30
   memorySize: 128
   environment:

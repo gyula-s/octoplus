@@ -1,0 +1,138 @@
+{
+  "/Users/vinczehajni/projects/octoplus/serverless.yml": {
+    "versionFramework": "4.19.1",
+    "servicePath": "/Users/vinczehajni/projects/octoplus/serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "octoplus-benefits",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs20.x",
+        "region": "eu-west-1",
+        "stage": "dev",
+        "timeout": 30,
+        "memorySize": 128,
+        "environment": {
+          "OCTOPUS_API_KEY": "<REDACTED>",
+          "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+        },
+        "iam": {
+          "role": {
+            "statements": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+        },
+        "versionFunctions": true
+      },
+      "functions": {
+        "caffenero": {
+          "handler": "dist/lambda.handler",
+          "name": "octoplus-benefits-dev-caffenero",
+          "description": "Automated Caffe Nero benefit claiming for Octoplus",
+          "timeout": 30,
+          "memorySize": 128,
+          "events": [
+            {
+              "schedule": {
+                "name": "octoplus-benefits-dev-caffenero-schedule",
+                "description": "Run every 10 minutes between 5-6:30 AM on Mondays",
+                "rate": [
+                  "cron(0/10 5-6 ? * MON *)"
+                ],
+                "enabled": true
+              }
+            }
+          ]
+        }
+      },
+      "package": {
+        "patterns": [
+          "dist/**",
+          "node_modules/**",
+          "!src/**",
+          "!*.ts",
+          "!queries/*.ts",
+          "!.env"
+        ],
+        "excludeDevDependencies": true,
+        "artifactsS3KeyDirname": "serverless/octoplus-benefits/dev/code-artifacts"
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "eu-west-1",
+      "stage": "dev",
+      "timeout": 30,
+      "memorySize": 128,
+      "environment": {
+        "OCTOPUS_API_KEY": "<REDACTED>",
+        "OCTOPUS_ACCOUNT_NUMBER": "A-4FB4AE60"
+      },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      },
+      "versionFunctions": true
+    },
+    "dashboard": {
+      "isEnabledForService": false,
+      "requiredAuthentication": false,
+      "orgFeaturesInUse": null,
+      "orgObservabilityIntegrations": null,
+      "serviceAppId": null,
+      "serviceProvider": null,
+      "instanceParameters": null
+    },
+    "serviceRawFile": "service: octoplus-benefits\n\nprovider:\n  name: aws\n  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda\n  region: eu-west-1  # Ireland region - change if needed\n  stage: ${opt:stage, 'dev'}  # Default to 'dev' stage\n  timeout: 30\n  memorySize: 128\n  environment:\n    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}\n    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n          Resource: \"*\"\n\nfunctions:\n  caffenero:\n    handler: dist/lambda.handler\n    name: ${self:service}-${self:provider.stage}-caffenero\n    description: \"Automated Caffe Nero benefit claiming for Octoplus\"\n    timeout: 30\n    memorySize: 128\n    events:\n      - schedule:\n          name: ${self:service}-${self:provider.stage}-caffenero-schedule\n          description: \"Run every 10 minutes between 5-6:30 AM on Mondays\"\n          rate: cron(0/10 5-6 ? * MON *)\n          enabled: true\n\npackage:\n  patterns:\n    - 'dist/**'\n    - 'node_modules/**'\n    - '!src/**'\n    - '!*.ts'\n    - '!queries/*.ts'\n    - '!.env'\n  excludeDevDependencies: true",
+    "command": [
+      "invoke"
+    ],
+    "options": {
+      "function": "caffenero"
+    },
+    "orgId": "a9a299a8-ca8e-4edc-8b39-7dcb4b578979",
+    "orgName": "soosgyul",
+    "userId": "yrrhpP47YbfD9q1QsV",
+    "userName": "soosgyul",
+    "serviceProviderAwsAccountId": "269825205789",
+    "serviceProviderAwsCfStackName": "octoplus-benefits-dev",
+    "serviceProviderAwsCfStackId": "arn:aws:cloudformation:eu-west-1:269825205789:stack/octoplus-benefits-dev/cbae12f0-966d-11f0-b50a-02e62a317287",
+    "serviceProviderAwsCfStackCreated": "2025-09-20T22:04:36.433Z",
+    "serviceProviderAwsCfStackUpdated": "2025-09-20T22:09:26.305Z",
+    "serviceProviderAwsCfStackStatus": "UPDATE_COMPLETE",
+    "serviceProviderAwsCfStackOutputs": [
+      {
+        "OutputKey": "CaffeneroLambdaFunctionQualifiedArn",
+        "OutputValue": "arn:aws:lambda:eu-west-1:269825205789:function:octoplus-benefits-dev-caffenero:2",
+        "Description": "Current Lambda function version",
+        "ExportName": "sls-octoplus-benefits-dev-CaffeneroLambdaFunctionQualifiedArn"
+      },
+      {
+        "OutputKey": "ServerlessDeploymentBucketName",
+        "OutputValue": "serverless-framework-deployments-eu-west-1-18755026-1cca",
+        "ExportName": "sls-octoplus-benefits-dev-ServerlessDeploymentBucketName"
+      }
+    ]
+  }
+}
