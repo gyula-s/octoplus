@@ -1,0 +1,44 @@
+service: octoplus-benefits
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: eu-west-2  # London region - change if needed
+  timeout: 30
+  memorySize: 128
+  environment:
+    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY}
+    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+
+functions:
+  caffenero:
+    handler: dist/lambda.handler
+    name: ${self:service}-${self:provider.stage}-caffenero
+    description: "Automated Caffe Nero benefit claiming for Octoplus"
+    timeout: 30
+    memorySize: 128
+    events:
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-caffenero-schedule
+          description: "Run every 10 minutes between 5-6:30 AM on Mondays"
+          rate: cron(0/10 5-6 ? * MON *)
+          enabled: true
+
+package:
+  patterns:
+    - 'dist/**'
+    - 'node_modules/**'
+    - '!src/**'
+    - '!*.ts'
+    - '!queries/*.ts'
+    - '!.env'
+  excludeDevDependencies: true

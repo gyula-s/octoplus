@@ -1,0 +1,28 @@
+{
+  "name": "octoplus",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsx index.ts",
+    "build": "npx tsc",
+    "deploy": "npm run build && serverless deploy",
+    "logs": "serverless logs -f caffenero",
+    "invoke": "serverless invoke -f caffenero",
+    "remove": "serverless remove"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^8.2.3",
+    "@types/minimatch": "^6.0.0",
+    "@types/node": "^24.5.2",
+    "serverless-plugin-typescript": "^2.1.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
