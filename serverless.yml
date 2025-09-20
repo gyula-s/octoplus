@@ -3,7 +3,7 @@ service: octoplus-benefits
 provider:
   name: aws
   runtime: nodejs18.x
-  region: eu-west-2  # London region - change if needed
+  region: eu-west-1  # Ireland region - change if needed
   timeout: 30
   memorySize: 128
   environment:

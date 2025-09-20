@@ -118,7 +118,7 @@ You need AWS credentials to deploy the Lambda function. Here are the options:
    Enter when prompted:
    - **AWS Access Key ID**: Your access key from step 2
    - **AWS Secret Access Key**: Your secret key from step 2
-   - **Default region**: `eu-west-2` (London) or your preferred region
+   - **Default region**: `eu-west-1` (Ireland) or your preferred region
    - **Default output format**: Just press Enter (uses json)
 
 4. **Test the configuration**:
