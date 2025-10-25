@@ -1,5 +1,8 @@
 service: octoplus-benefits
 
+custom:
+  stateTableName: ${self:service}-state-${self:provider.stage}
+
 provider:
   name: aws
   runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda
@@ -9,19 +12,19 @@ provider:
   memorySize: 128
   logRetentionInDays: 14  # Keep logs for 2 weeks
   environment:
-    # Support for multiple accounts (numbered format)
-    OCTOPUS_API_KEY_1: ${env:OCTOPUS_API_KEY_1, ''}
-    OCTOPUS_ACCOUNT_NUMBER_1: ${env:OCTOPUS_ACCOUNT_NUMBER_1, ''}
-    OCTOPUS_API_KEY_2: ${env:OCTOPUS_API_KEY_2, ''}
-    OCTOPUS_ACCOUNT_NUMBER_2: ${env:OCTOPUS_ACCOUNT_NUMBER_2, ''}
-    OCTOPUS_API_KEY_3: ${env:OCTOPUS_API_KEY_3, ''}
-    OCTOPUS_ACCOUNT_NUMBER_3: ${env:OCTOPUS_ACCOUNT_NUMBER_3, ''}
-    # Legacy support (for backward compatibility)
-    OCTOPUS_API_KEY: ${env:OCTOPUS_API_KEY, ''}
-    OCTOPUS_ACCOUNT_NUMBER: ${env:OCTOPUS_ACCOUNT_NUMBER, ''}
+    # DynamoDB state table
+    STATE_TABLE_NAME: ${self:custom.stateTableName}
+    # SSM Parameter Store path prefix
+    SSM_PATH_PREFIX: /octoplus/${self:provider.stage}
+    # Deployment stage
+    STAGE: ${self:provider.stage}
+    # Force email sending on every run (true) or only for new voucher codes (false)
+    FORCE_EMAIL_SEND: ${env:FORCE_EMAIL_SEND, 'false'}
+    # Note: AWS_REGION is automatically provided by Lambda runtime
   iam:
     role:
       statements:
+        # CloudWatch Logs
         - Effect: Allow
           Action:
             - logs:CreateLogGroup
@@ -31,34 +34,114 @@ provider:
             - logs:DescribeLogStreams
           Resource: "*"
 
+        # SSM Parameter Store (read account credentials)
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource:
+            - arn:aws:ssm:${self:provider.region}:${aws:accountId}:parameter/octoplus/${self:provider.stage}/*
+
+        # DynamoDB (state tracking)
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+          Resource:
+            - !GetAtt OctoplusStateTable.Arn
+
+        # SES (send emails)
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource: "*"
+
 functions:
   caffenero:
     handler: dist/lambda.handler
     name: ${self:service}-${self:provider.stage}-caffenero
-    description: "Automated Caffe Nero benefit claiming for Octoplus"
+    description: "Automated Caffe Nero benefit claiming for Octoplus with email notifications"
     timeout: 30
     memorySize: 128
     logRetentionInDays: 14
     events:
+      # Account 1 Schedule
       - schedule:
-          name: ${self:service}-${self:provider.stage}-caffenero-schedule
-          description: "Run every 10 minutes between 5-6:30 AM on Mondays"
+          name: ${self:service}-${self:provider.stage}-account-1
+          description: "Claim Caffe Nero for Account 1 (Mon 5-6:30 AM UTC)"
           rate: cron(0/10 5-6 ? * MON *)
           enabled: true
+          input:
+            accountNumber: "1"
+
+      # Account 2 Schedule
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2
+          description: "Claim Caffe Nero for Account 2 (Mon 5-6:30 AM UTC)"
+          rate: cron(0/10 5-6 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "2"
+
+      # Account 3 Schedule
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3
+          description: "Claim Caffe Nero for Account 3 (Mon 5-6:30 AM UTC)"
+          rate: cron(0/10 5-6 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "3"
 
 resources:
+  Resources:
+    # DynamoDB table for state tracking
+    OctoplusStateTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.stateTableName}
+        BillingMode: PAY_PER_REQUEST  # On-demand pricing (no provisioned capacity)
+        AttributeDefinitions:
+          - AttributeName: accountNumber
+            AttributeType: S
+        KeySchema:
+          - AttributeName: accountNumber
+            KeyType: HASH  # Partition key
+        TimeToLiveSpecification:
+          Enabled: true
+          AttributeName: ttl  # Auto-delete expired items
+        Tags:
+          - Key: Service
+            Value: ${self:service}
+          - Key: Stage
+            Value: ${self:provider.stage}
+          - Key: Purpose
+            Value: "State tracking for weekly voucher claims"
+
   Outputs:
     LambdaFunctionName:
       Description: "Lambda Function Name"
       Value: ${self:service}-${self:provider.stage}-caffenero
       Export:
         Name: ${self:service}-${self:provider.stage}-function-name
-    
+
     LogGroupName:
       Description: "CloudWatch Log Group for Lambda"
       Value: /aws/lambda/${self:service}-${self:provider.stage}-caffenero
       Export:
         Name: ${self:service}-${self:provider.stage}-log-group
+
+    DynamoDBTableName:
+      Description: "DynamoDB State Table Name"
+      Value: ${self:custom.stateTableName}
+      Export:
+        Name: ${self:service}-${self:provider.stage}-state-table
+
+    DynamoDBTableArn:
+      Description: "DynamoDB State Table ARN"
+      Value: !GetAtt OctoplusStateTable.Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-state-table-arn
 
 package:
   patterns:

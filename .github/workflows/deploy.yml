@@ -1,0 +1,52 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  deploy:
+    name: Deploy Serverless Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript build
+        run: npm run build
+
+      - name: Deploy to AWS via Serverless Framework
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: npx serverless deploy --stage dev --region eu-west-1 --verbose
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "🔍 View logs: aws logs tail /aws/lambda/octoplus-benefits-dev-caffenero --follow"
+          echo "📊 Check DynamoDB: aws dynamodb scan --table-name octoplus-benefits-state-dev"
+          echo "🔑 Verify SSM params: aws ssm get-parameters-by-path --path /octoplus/dev --recursive"
+
+      - name: Deployment Failed
+        if: failure()
+        run: |
+          echo "❌ Deployment failed. Check the logs above for details."
+          echo "Common issues:"
+          echo "  - Missing AWS credentials (check GitHub secrets)"
+          echo "  - Invalid serverless.yml syntax"
+          echo "  - IAM permission issues"
+          echo "  - TypeScript compilation errors"
