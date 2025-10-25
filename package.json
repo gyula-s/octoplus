@@ -14,12 +14,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^17.2.2"
+    "@aws-sdk/client-dynamodb": "^3.712.0",
+    "@aws-sdk/client-ses": "^3.712.0",
+    "@aws-sdk/client-ssm": "^3.712.0",
+    "@aws-sdk/lib-dynamodb": "^3.712.0",
+    "dotenv": "^17.2.2",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/dotenv": "^8.2.3",
     "@types/minimatch": "^6.0.0",
     "@types/node": "^24.5.2",
+    "@types/qrcode": "^1.5.5",
     "serverless-plugin-typescript": "^2.1.5",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"

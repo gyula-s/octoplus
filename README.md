@@ -1,344 +1,339 @@
 # Octoplus Caffe Nero Auto-Claimer
 
-Automatically claim your weekly Caffe Nero benefit from Octoplus every Monday morning using AWS Lambda.
+Automatically claim your weekly Caffe Nero coffee vouchers from Octopus Energy's Octoplus rewards program, with email notifications containing QR codes ready to scan at the store.
 
-## 🎯 What This Does
+---
 
-- **Checks** if Caffe Nero benefit is available to claim
-- **Claims** it automatically if available
-- **Shows** your voucher code if already claimed
-- **Runs** every 10 minutes between 5:00-6:30 AM on Mondays
-- **Costs** $0 (within AWS free tier)
+## ✨ Features
 
-## 📋 Prerequisites
+- ☕ **Automatic Weekly Claims** - Claims vouchers every Monday morning (5:00-6:30 AM UTC)
+- 📧 **Email Notifications** - Sends QR code directly to your inbox, ready to use
+- 🔄 **Multi-Account Support** - Manages unlimited Octopus Energy accounts in parallel
+- 🗂️ **Smart State Management** - Prevents duplicate claims with DynamoDB tracking
+- 🔒 **Secure Credentials** - Stores API keys in AWS SSM Parameter Store (encrypted)
+- 🚀 **CI/CD Pipeline** - Auto-deploys on git push via GitHub Actions
+- 💰 **Zero Cost** - Runs entirely within AWS free tier
 
-### 1. AWS Account
-- Create a free AWS account at [aws.amazon.com](https://aws.amazon.com)
-- You'll need AWS credentials configured
+---
 
-### 2. Node.js & npm
-```bash
-# Check if you have Node.js installed
-node --version  # Should be v16+ 
-npm --version
+## 🏗️ Architecture
+
+```
+EventBridge Scheduler (Monday 5-6:30 AM UTC)
+  ├─ Account 1 → Lambda → SSM (credentials) → DynamoDB (state) → Octopus API → QR Email
+  ├─ Account 2 → Lambda → SSM (credentials) → DynamoDB (state) → Octopus API → QR Email
+  └─ Account 3 → Lambda → SSM (credentials) → DynamoDB (state) → Octopus API → QR Email
 ```
 
-If not installed, download from [nodejs.org](https://nodejs.org)
+**Key Components:**
+- **AWS Lambda**: Serverless function (Node.js 20.x)
+- **EventBridge**: Multiple schedules (one per account) for parallel execution
+- **DynamoDB**: State tracking with automatic weekly reset (Saturday 9 AM UTC)
+- **SSM Parameter Store**: Encrypted credential storage
+- **AWS SES**: Email delivery with QR code attachments
+- **GitHub Actions**: Automated deployments on main branch changes
 
-### 3. Serverless Framework
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 20+
+- AWS Account with CLI configured
+- Octopus Energy account(s) with API keys
+- GitHub account (for CI/CD)
+
+### Installation
+
 ```bash
-# Install globally
-npm install -g serverless
-
-# Verify installation
-serverless --version
-```
-
-## ⚙️ Setup Instructions
-
-### Step 1: Clone and Install Dependencies
-
-```bash
-# Navigate to your project directory
-cd /path/to/octoplus
+# Clone repository
+git clone https://github.com/YOUR_USERNAME/octoplus.git
+cd octoplus
 
 # Install dependencies
 npm install
+
+# Build TypeScript
+npm run build
 ```
 
-### Step 2: Configure Environment Variables
+### Configuration
 
-Copy the sample environment file and configure your credentials:
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for complete setup guide.
+
+**Quick summary:**
+1. Create AWS IAM user for deployments
+2. Verify sender email in AWS SES
+3. Store credentials in AWS SSM Parameter Store
+4. Configure GitHub secrets for CI/CD
+5. Deploy via `serverless deploy`
+
+---
+
+## 🔧 How It Works
+
+### Weekly Cycle
+
+**Monday 5:00-6:30 AM UTC** (Claim Window):
+1. EventBridge triggers Lambda for each account (parallel execution)
+2. Lambda fetches credentials from SSM Parameter Store
+3. Checks DynamoDB state - skip if already processed this week
+4. Calls Octopus API to claim Caffe Nero voucher
+5. Generates QR code from barcode value
+6. Sends email with QR code attachment
+7. Saves state to DynamoDB
+
+**Saturday 9:00 AM UTC** (Reset Boundary):
+- State becomes "stale" and can be claimed again next Monday
+
+**Monday-Friday**: No executions (Lambda never runs)
+
+### State Management
+
+State stored in DynamoDB per account:
+```json
+{
+  "accountNumber": "A-12345678",
+  "voucherCode": "ABC123XYZ",
+  "lastClaimedAt": 1729843200000,
+  "emailSentAt": 1729843200000,
+  "ttl": 1732435200
+}
+```
+
+### Email Notifications
+
+Each successful claim sends an HTML email containing:
+- Voucher code
+- QR code (PNG attachment + embedded in email body)
+- Expiration date
+- Usage instructions
+- Redemption steps
+
+**Email Configuration:**
+- **Optional per account** - Set `EMAIL_ADDRESS_X` in SSM for each account
+- **Graceful degradation** - If no email configured, claim still succeeds (no email sent)
+- **SES Sandbox Mode** - Works with verified emails only (default)
+
+---
+
+## 📦 Adding/Removing Accounts
+
+### Add New Account
 
 ```bash
-# Copy the sample file
-cp .env.sample .env
+# 1. Add SSM parameters
+aws ssm put-parameter \
+  --name "/octoplus/dev/account-4/api-key" \
+  --value "sk_live_..." \
+  --type "SecureString" \
+  --region eu-west-1
+
+aws ssm put-parameter \
+  --name "/octoplus/dev/account-4/account-number" \
+  --value "A-XXXXXXXX" \
+  --type "String" \
+  --region eu-west-1
+
+aws ssm put-parameter \
+  --name "/octoplus/dev/account-4/email" \
+  --value "your-email@example.com" \
+  --type "String" \
+  --region eu-west-1
+
+# 2. Update serverless.yml (add new schedule event)
+# 3. Push to main branch (GitHub Actions deploys automatically)
 ```
 
-Edit the `.env` file and add your Octopus Energy credentials:
+See [DEPLOYMENT.md#addingremoving-accounts](./DEPLOYMENT.md#addingremoving-accounts) for details.
 
-```bash
-# Open .env file in your editor
-nano .env
-# or
-code .env
-```
+---
 
-Fill in your actual values:
-
-```env
-# Your Octopus Energy API Key (found in your account settings)
-OCTOPUS_API_KEY=sk_live_your_actual_api_key_here
-
-# Your Octopus Energy Account Number (format: A-XXXXXXXX)
-OCTOPUS_ACCOUNT_NUMBER=A-your_account_number
-```
-
-**Where to find these values:**
-- **API Key**: Octopus Energy account → Developer settings → Create API key
-- **Account Number**: Octopus Energy dashboard → Account overview (format: A-XXXXXXXX)
-
-### Step 3: Configure AWS Credentials
-
-You need AWS credentials to deploy the Lambda function. Here are the options:
-
-#### Option A: AWS CLI (Recommended)
-
-1. **Install AWS CLI** (if not already installed):
-   ```bash
-   # macOS (using Homebrew)
-   brew install awscli
-   
-   # macOS (using installer)
-   # Download from: https://awscli.amazonaws.com/AWSCLIV2.pkg
-   
-   # Windows
-   # Download from: https://awscli.amazonaws.com/AWSCLIV2.msi
-   
-   # Linux
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-   unzip awscliv2.zip
-   sudo ./aws/install
-   ```
-
-2. **Get your AWS credentials** from AWS Console:
-   - Go to [AWS Console](https://console.aws.amazon.com)
-   - Click your name (top right) → Security credentials
-   - Scroll down to "Access keys" section
-   - Click "Create access key"
-   - Choose "Command Line Interface (CLI)"
-   - Click "Create access key"
-   - **Save both the Access Key ID and Secret Access Key**
-
-3. **Configure AWS CLI**:
-   ```bash
-   aws configure
-   ```
-   
-   Enter when prompted:
-   - **AWS Access Key ID**: Your access key from step 2
-   - **AWS Secret Access Key**: Your secret key from step 2
-   - **Default region**: `eu-west-1` (Ireland) or your preferred region
-   - **Default output format**: Just press Enter (uses json)
-
-4. **Test the configuration**:
-   ```bash
-   aws sts get-caller-identity
-   ```
-   
-   You should see something like:
-   ```json
-   {
-       "UserId": "AIDAXX...",
-       "Account": "123456789012",
-       "Arn": "arn:aws:iam::123456789012:user/your-username"
-   }
-   ```
-
-#### Option B: Environment Variables (Temporary)
-
-```bash
-export AWS_ACCESS_KEY_ID=your_access_key_here
-export AWS_SECRET_ACCESS_KEY=your_secret_key_here
-export AWS_DEFAULT_REGION=eu-west-2
-```
-
-⚠️ **Note**: These expire when you close your terminal.
-
-#### Option C: Serverless Dashboard (Alternative)
-
-```bash
-# Login to Serverless Dashboard
-serverless login
-
-# Follow the browser authentication flow
-# This will handle AWS credentials through Serverless
-```
-
-#### ⚠️ Important Security Notes:
-
-- **Never share your AWS credentials**
-- **Don't commit them to git**
-- **Use IAM users, not root account**
-- **Enable MFA on your AWS account**
-- **Rotate keys periodically**
-
-### Step 4: Test Locally (Optional)
-
-```bash
-# Test the function locally
-npm run test
-# or
-tsx index.ts
-```
-
-You should see output like:
-```
-🔍 Checking Caffe Nero benefit status...
-1️⃣ Fetching available benefits...
-📋 Found: A hot or cold drink on us - any size, every week
-...
-```
-
-## 🚀 Deployment
-
-### Deploy to AWS Lambda
-
-```bash
-# Run the deployment script
-./deploy.sh
-```
-
-Or manually:
-
-```bash
-# Compile TypeScript
-npx tsc
-
-# Deploy to AWS
-serverless deploy
-```
-
-### Expected Output
-
-```
-✅ Service deployed to stack octoplus-benefits-dev
-
-endpoints: (none)
-functions:
-  caffenero: octoplus-benefits-dev-caffenero
-
-Stack Outputs:
-  CaffeneroLambdaFunctionQualifiedArn: arn:aws:lambda:eu-west-2:...
-```
-
-## 🔧 Management Commands
+## 📊 Monitoring
 
 ### View Logs
+
 ```bash
-# View recent logs
-serverless logs -f caffenero
+# Real-time logs
+aws logs tail /aws/lambda/octoplus-benefits-dev-caffenero --follow
 
-# Follow logs in real-time
-serverless logs -f caffenero --tail
+# Last 100 lines
+aws logs tail /aws/lambda/octoplus-benefits-dev-caffenero --since 1h
 ```
 
-### Test Function
+### Check State
+
 ```bash
-# Invoke function manually
-serverless invoke -f caffenero
+# View DynamoDB state
+aws dynamodb scan --table-name octoplus-benefits-state-dev
+
+# Check SSM parameters
+aws ssm get-parameters-by-path --path /octoplus/dev --recursive
 ```
 
-### Update Deployment
+### Test Manual Invocation
+
 ```bash
-# After making code changes
-npx tsc
-serverless deploy
+# Test account 1
+aws lambda invoke \
+  --function-name octoplus-benefits-dev-caffenero \
+  --payload '{"accountNumber":"1"}' \
+  response.json
+
+cat response.json | jq .
 ```
 
-### Remove Deployment
-```bash
-# Delete everything from AWS
-serverless remove
-```
-
-## 📅 Schedule Details
-
-The function runs on this schedule:
-- **Days**: Mondays only
-- **Time**: 5:00 AM - 6:30 AM (UTC)
-- **Frequency**: Every 10 minutes
-- **Total runs**: 10 times per Monday
-
-To change the schedule, edit `serverless.yml`:
-```yaml
-events:
-  - schedule:
-      rate: cron(0/10 5-6 ? * MON *)  # Modify this line
-```
+---
 
 ## 💰 Cost Breakdown
 
-**AWS Lambda Free Tier:**
-- 1,000,000 requests per month
-- 400,000 GB-seconds compute time
+**Monthly Usage (3 accounts):**
+- Lambda: 120 invocations × ~2s = **$0.00** (1M free requests/month)
+- DynamoDB: 120 reads + 12 writes = **$0.00** (25 GB-seconds free/month)
+- SSM Parameters: 9 parameters = **$0.00** (Standard parameters always free)
+- SES: 12 emails = **$0.00** (62,000 free emails/month from Lambda)
+- CloudWatch Logs: ~15 MB = **$0.00** (5 GB free/month)
 
-**Your usage:**
-- ~40 requests per month (10 per Monday × 4 Mondays)
-- Each request takes ~2-5 seconds
-- **Total cost: $0.00** ✅
+**Total Monthly Cost: $0.00** ✅
 
-## 🔍 Troubleshooting
+---
+
+## 🔒 Security
+
+### Credentials Storage
+
+- ✅ API keys stored in **AWS SSM Parameter Store** (encrypted at rest)
+- ✅ Never committed to git
+- ✅ Not stored in GitHub secrets
+- ✅ Not in environment variables
+
+### IAM Permissions
+
+Lambda role has minimal permissions:
+- SSM: Read-only access to `/octoplus/*` parameters
+- DynamoDB: Read/write to state table only
+- SES: Send emails only
+- CloudWatch: Write logs only
+
+### Email Security
+
+- Sender verified in AWS SES
+- Emails contain voucher codes (sensitive data)
+- Recommend using personal email only
+- SES sandbox mode by default (can only email verified addresses)
+
+---
+
+## 🐛 Troubleshooting
 
 ### Common Issues
 
-#### 1. "Cannot find module" errors
-```bash
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-```
+**1. "Parameter /octoplus/dev/account-X/api-key not found"**
+- ✅ Solution: Add SSM parameters (see [DEPLOYMENT.md](./DEPLOYMENT.md))
 
-#### 2. AWS credentials not found
-```bash
-# Check AWS configuration
-aws sts get-caller-identity
+**2. "Email address is not verified"**
+- ✅ Solution: Verify sender in AWS SES console (`soosgyul@gmail.com`)
 
-# If this fails, reconfigure:
-aws configure
-```
+**3. Lambda skips account every Monday**
+- ✅ Check: DynamoDB state shows `lastClaimedAt` after Saturday 9 AM UTC?
+- ✅ Solution: State is fresh - wait until next Saturday's reset
 
-#### 3. Deployment fails
-```bash
-# Check Serverless version
-serverless --version
+**4. GitHub Actions deployment fails**
+- ✅ Check: AWS credentials in GitHub secrets?
+- ✅ Check: IAM user has deployment permissions?
 
-# Update if needed
-npm install -g serverless@latest
-```
+**5. No email received after successful claim**
+- ✅ Check: `EMAIL_ADDRESS_X` parameter exists in SSM?
+- ✅ Check: Recipient email verified in SES (if sandbox mode)?
+- ✅ Check: CloudWatch logs for email sending errors
 
-#### 4. Function times out
-The function has a 30-second timeout. If it times out:
-- Check AWS CloudWatch logs
-- Verify your API credentials are correct
-- Check Octopus Energy service status
+See [DEPLOYMENT.md#troubleshooting](./DEPLOYMENT.md#troubleshooting) for detailed solutions.
 
-### Viewing Detailed Logs
+---
 
-1. Go to AWS Console → CloudWatch → Log Groups
-2. Find `/aws/lambda/octoplus-benefits-dev-caffenero`
-3. View the latest log stream
+## 🛠️ Development
 
-### Testing Authentication
+### Local Testing
 
 ```bash
-# Test your credentials work
-tsx auth.ts
+# Run for single account (uses real SSM/DynamoDB)
+npm run build
+sls invoke local -f caffenero -d '{"accountNumber":"1"}'
 ```
 
-## 🔒 Security Notes
+### Project Structure
 
-- Never commit your `.env` file to version control
-- Use AWS IAM roles with minimal permissions
-- Rotate your API keys periodically
-- Monitor AWS CloudTrail for access logs
+```
+octoplus/
+├── src/
+│   ├── services/
+│   │   ├── parameters.ts    # SSM Parameter Store
+│   │   ├── state.ts          # DynamoDB state tracking
+│   │   └── email.ts          # QR code generation + SES
+│   └── types.ts              # TypeScript interfaces
+├── lambda.ts                 # Lambda handler (single account)
+├── index.ts                  # Main logic (Octopus API)
+├── serverless.yml            # Infrastructure config
+├── DEPLOYMENT.md             # Setup guide
+└── .github/workflows/
+    └── deploy.yml            # CI/CD pipeline
+```
 
-## 📞 Support
+### Key Files
 
-If you encounter issues:
+- **lambda.ts**: Entry point for Lambda invocations
+- **src/services/parameters.ts**: Fetches credentials from SSM
+- **src/services/state.ts**: Manages DynamoDB state with weekly reset logic
+- **src/services/email.ts**: Generates QR codes and sends via SES
+- **serverless.yml**: Defines EventBridge schedules, DynamoDB table, IAM permissions
 
-1. **Check logs**: `serverless logs -f caffenero`
-2. **Test locally**: `tsx index.ts`
-3. **Verify credentials**: Check `.env` file
-4. **AWS status**: Check AWS service health
-5. **Octopus status**: Verify your Octopus account
+---
 
-## 🎉 Success!
+## 📖 Documentation
 
-Once deployed, your Lambda function will:
-- Automatically run every Monday morning
-- Claim your Caffe Nero benefit if available
-- Send logs to CloudWatch for monitoring
-- Cost you absolutely nothing! ☕
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
+  - AWS IAM setup
+  - SES email verification
+  - SSM parameter configuration
+  - GitHub Actions secrets
+  - Testing and monitoring
 
-Enjoy your free weekly coffee! ☕️✨
+---
+
+## 🎯 Roadmap
+
+Future enhancements:
+- [ ] Web dashboard for viewing claim history
+- [ ] Slack/Discord notification support
+- [ ] Support for other Octoplus partner offers
+- [ ] Cost optimization insights
+- [ ] Advanced scheduling options
+
+---
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+---
+
+## 🙏 Acknowledgments
+
+- Octopus Energy for the Octoplus rewards program
+- AWS for generous free tier
+- Serverless Framework for infrastructure management
+
+---
+
+## 💬 Support
+
+Need help?
+1. Check [DEPLOYMENT.md](./DEPLOYMENT.md)
+2. Review [Troubleshooting](#troubleshooting)
+3. Check CloudWatch logs
+4. Open a GitHub issue
+
+---
+
+**Enjoy your free weekly coffee!** ☕✨
