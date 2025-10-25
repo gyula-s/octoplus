@@ -20,6 +20,8 @@ provider:
     STAGE: ${self:provider.stage}
     # Force email sending on every run (true) or only for new voucher codes (false)
     FORCE_EMAIL_SEND: ${env:FORCE_EMAIL_SEND, 'false'}
+    # SES sender email address (must be verified in AWS SES)
+    SES_SENDER_EMAIL: ${env:SES_SENDER_EMAIL, 'soosgyul@gmail.com'}
     # Note: AWS_REGION is automatically provided by Lambda runtime
   iam:
     role:
@@ -66,7 +68,7 @@ functions:
     memorySize: 128
     logRetentionInDays: 14
     events:
-      # Account 1 Schedule
+      # Account 1 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-1
           description: "Claim Caffe Nero for Account 1 (Mon 5-6:30 AM UTC)"
@@ -75,7 +77,7 @@ functions:
           input:
             accountNumber: "1"
 
-      # Account 2 Schedule
+      # Account 2 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-2
           description: "Claim Caffe Nero for Account 2 (Mon 5-6:30 AM UTC)"
@@ -84,7 +86,7 @@ functions:
           input:
             accountNumber: "2"
 
-      # Account 3 Schedule
+      # Account 3 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-3
           description: "Claim Caffe Nero for Account 3 (Mon 5-6:30 AM UTC)"

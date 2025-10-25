@@ -14,7 +14,10 @@ const sesClient = new SESClient({
 });
 
 // SES sender email (verified in AWS SES)
-const SES_SENDER_EMAIL = 'soosgyul@gmail.com';
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
+if (!SES_SENDER_EMAIL) {
+  throw new Error('SES_SENDER_EMAIL environment variable is not set');
+}
 
 /**
  * Generate QR code as PNG buffer from barcode string
@@ -92,7 +95,7 @@ function createEmailHTML(voucher: VoucherInfo): string {
       </div>
     </div>
 
-    <div style="background-color: #fff3cd; border-left: 4px solid: #ff9800; padding: 15px; margin: 25px 0; border-radius: 4px;">
+    <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; margin: 25px 0; border-radius: 4px;">
       <p style="margin: 0; font-size: 14px; color: #856404;">
         <strong>💡 Tip:</strong> Screenshot this email or save the QR code image to your photos for easy access at the coffee shop.
       </p>

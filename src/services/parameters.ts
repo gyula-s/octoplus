@@ -122,10 +122,13 @@ export async function getAccountCredentials(accountNumber: string): Promise<Acco
       throw new Error(`Invalid account number format for account ${accountNumber} (expected format: A-XXXXXXXX)`);
     }
 
-    // Parse email addresses (comma-separated)
+    // Parse and validate email addresses (comma-separated)
     const emailString = email.status === 'fulfilled' ? email.value : undefined;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const emails = emailString
-      ? emailString.split(',').map(e => e.trim()).filter(e => e.length > 0)
+      ? emailString.split(',')
+          .map(e => e.trim())
+          .filter(e => e.length > 0 && emailRegex.test(e))
       : [];
 
     const credentials: AccountCredentials = {
