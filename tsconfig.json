@@ -15,10 +15,11 @@
   },
   "include": [
     "index.ts",
-    "lambda.ts", 
+    "lambda.ts",
     "auth.ts",
     "graphql.ts",
-    "queries/*.ts"
+    "queries/*.ts",
+    "scripts/*.ts"
   ],
   "exclude": [
     "node_modules",

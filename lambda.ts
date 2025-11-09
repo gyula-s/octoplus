@@ -71,6 +71,9 @@ export const handler = async (
 
     console.log(`✓ Credentials loaded for account: ${credentials.accountNumber}`);
     console.log(`✓ API Key: ${credentials.apiKey.substring(0, 12)}...`);
+    if (credentials.nickname) {
+      console.log(`✓ Nickname: ${credentials.nickname}`);
+    }
     if (credentials.emails.length > 0) {
       console.log(`✓ Email(s) configured: ${credentials.emails.join(', ')}`);
       console.log(`✓ Total recipients: ${credentials.emails.length}`);
@@ -163,7 +166,12 @@ export const handler = async (
       if (shouldSend) {
         console.log(`📧 Sending email with QR code to ${credentials.emails.length} recipient(s)...`);
         try {
-          await sendVoucherEmail(credentials.emails, claimResult.voucher);
+          // Add nickname to voucher info for email personalization
+          const voucherWithNickname = {
+            ...claimResult.voucher,
+            nickname: credentials.nickname,
+          };
+          await sendVoucherEmail(credentials.emails, voucherWithNickname);
           emailSent = true;
           console.log(`✓ Email sent successfully to: ${credentials.emails.join(', ')}`);
         } catch (emailError) {

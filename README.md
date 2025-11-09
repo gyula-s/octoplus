@@ -8,6 +8,7 @@ Automatically claim your weekly Caffe Nero coffee vouchers from Octopus Energy's
 
 - ☕ **Automatic Weekly Claims** - Claims vouchers every Monday morning (5:00-6:30 AM UTC)
 - 📧 **Email Notifications** - Sends QR code directly to your inbox, ready to use
+- 🏷️ **Account Nicknames** - Personalize emails with custom account names
 - 🔄 **Multi-Account Support** - Manages unlimited Octopus Energy accounts in parallel
 - 🗂️ **Smart State Management** - Prevents duplicate claims with DynamoDB tracking
 - 🔒 **Secure Credentials** - Stores API keys in AWS SSM Parameter Store (encrypted)
@@ -122,28 +123,58 @@ Each successful claim sends an HTML email containing:
 
 ### Add New Account
 
+Use the interactive script to add a new account:
+
 ```bash
-# 1. Add SSM parameters
+# Run the add account script
+AWS_REGION=eu-west-1 STAGE=dev ./scripts/add-account.sh
+```
+
+The script will:
+1. Prompt you for account details (Account ID, API Key, Octopus Account Number, Nickname, Emails)
+2. Validate all inputs
+3. Create the consolidated SSM parameter: `/octoplus/dev/account-{N}/config`
+4. Automatically update `serverless.yml` with a new EventBridge schedule
+5. Rebuild and deploy the Lambda function
+6. Show you next steps for testing
+
+**Example:**
+```bash
+$ ./scripts/add-account.sh
+========================================
+  Octoplus - Add New Account
+========================================
+
+Configuration:
+  Region: eu-west-1
+  Stage: dev
+
+Enter account details:
+
+Account Number (e.g., 4): 4
+Octopus Account Number (e.g., A-12345678): A-ABCD1234
+API Key (starts with sk_live_): sk_live_xxxxx...
+Nickname (optional, e.g., 'Home' or 'My Energy'): Summer House
+Email addresses (comma-separated): email@example.com
+
+✓ SSM parameter created
+✓ Added schedule for account 4
+✓ Lambda deployed successfully
+```
+
+### Manual Account Addition
+
+If you prefer to add accounts manually:
+
+```bash
+# Create consolidated SSM parameter with all account data
 aws ssm put-parameter \
-  --name "/octoplus/dev/account-4/api-key" \
-  --value "sk_live_..." \
+  --name "/octoplus/dev/account-4/config" \
+  --value '{"apiKey":"sk_live_...","accountNumber":"A-XXXXXXXX","nickname":"My Account","emails":["email@example.com"]}' \
   --type "SecureString" \
   --region eu-west-1
 
-aws ssm put-parameter \
-  --name "/octoplus/dev/account-4/account-number" \
-  --value "A-XXXXXXXX" \
-  --type "String" \
-  --region eu-west-1
-
-aws ssm put-parameter \
-  --name "/octoplus/dev/account-4/email" \
-  --value "your-email@example.com" \
-  --type "String" \
-  --region eu-west-1
-
-# 2. Update serverless.yml (add new schedule event)
-# 3. Push to main branch (GitHub Actions deploys automatically)
+# Then manually add schedule to serverless.yml and redeploy
 ```
 
 See [DEPLOYMENT.md#addingremoving-accounts](./DEPLOYMENT.md#addingremoving-accounts) for details.

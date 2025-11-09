@@ -25,9 +25,9 @@ export interface AccountCredentials {
   accountNumber: string;
   /** Octopus Energy API key (e.g., "sk_live_...") */
   apiKey: string;
-  /** Optional email address(es) for notifications (comma-separated if multiple) */
-  email?: string;
-  /** Parsed email addresses as array */
+  /** Optional account nickname for personalization */
+  nickname?: string;
+  /** Email addresses for notifications */
   emails: string[];
 }
 
@@ -83,6 +83,8 @@ export interface VoucherInfo {
   expiresAt?: string;
   /** Account number this voucher belongs to */
   accountNumber: string;
+  /** Optional account nickname for personalization */
+  nickname?: string;
 }
 
 // ============================================================================
