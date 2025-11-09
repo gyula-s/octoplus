@@ -74,12 +74,20 @@ async function getParameter(
 }
 
 /**
+ * Interface for the consolidated account configuration stored in SSM
+ */
+interface AccountConfig {
+  apiKey: string;
+  accountNumber: string;
+  nickname?: string;
+  emails: string[];
+}
+
+/**
  * Get account credentials from SSM Parameter Store
  *
- * Fetches three parameters:
- * - /octoplus/{stage}/account-{N}/api-key (SecureString, encrypted)
- * - /octoplus/{stage}/account-{N}/account-number (String)
- * - /octoplus/{stage}/account-{N}/email (String, optional)
+ * Fetches a single consolidated JSON parameter:
+ * - /octoplus/{stage}/account-{N}/config (JSON containing all account data)
  *
  * @param accountNumber - Account number identifier (e.g., "1", "2", "3")
  * @returns Account credentials
@@ -87,58 +95,62 @@ async function getParameter(
  *
  * @example
  * const credentials = await getAccountCredentials("1");
- * // Returns: { apiKey: "sk_live_...", accountNumber: "A-12345678", email: "user@example.com" }
+ * // Returns: { apiKey: "sk_live_...", accountNumber: "A-12345678", nickname: "My Account", emails: ["user@example.com"] }
  */
 export async function getAccountCredentials(accountNumber: string): Promise<AccountCredentials> {
   console.log(`[SSM] Fetching credentials for account ${accountNumber}`);
 
   const pathPrefix = getPathPrefix();
-  const accountPath = `${pathPrefix}/account-${accountNumber}`;
+  const configPath = `${pathPrefix}/account-${accountNumber}/config`;
 
   try {
-    // Fetch all parameters in parallel
-    const [apiKey, octopusAccountNumber, email] = await Promise.allSettled([
-      getParameter(`${accountPath}/api-key`, true), // Decrypt SecureString
-      getParameter(`${accountPath}/account-number`, false),
-      getParameter(`${accountPath}/email`, false),
-    ]);
+    // Fetch the consolidated config parameter
+    const configJson = await getParameter(configPath, true); // Decrypt SecureString
 
-    // Validate required parameters
-    if (apiKey.status === 'rejected') {
-      throw new Error(`API key not found for account ${accountNumber}: ${apiKey.reason}`);
+    // Parse JSON config
+    let config: AccountConfig;
+    try {
+      config = JSON.parse(configJson);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON format in config parameter: ${parseError}`);
     }
 
-    if (octopusAccountNumber.status === 'rejected') {
-      throw new Error(`Account number not found for account ${accountNumber}: ${octopusAccountNumber.reason}`);
+    // Validate required fields
+    if (!config.apiKey) {
+      throw new Error(`API key not found in config for account ${accountNumber}`);
+    }
+
+    if (!config.accountNumber) {
+      throw new Error(`Account number not found in config for account ${accountNumber}`);
     }
 
     // Validate API key format
-    if (!apiKey.value.startsWith('sk_')) {
+    if (!config.apiKey.startsWith('sk_')) {
       throw new Error(`Invalid API key format for account ${accountNumber} (must start with "sk_")`);
     }
 
     // Validate account number format
-    if (!/^A-[A-Z0-9]{8}$/.test(octopusAccountNumber.value)) {
+    if (!/^A-[A-Z0-9]{8}$/.test(config.accountNumber)) {
       throw new Error(`Invalid account number format for account ${accountNumber} (expected format: A-XXXXXXXX)`);
     }
 
-    // Parse and validate email addresses (comma-separated)
-    const emailString = email.status === 'fulfilled' ? email.value : undefined;
+    // Validate and filter email addresses
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const emails = emailString
-      ? emailString.split(',')
-          .map(e => e.trim())
-          .filter(e => e.length > 0 && emailRegex.test(e))
-      : [];
+    const validEmails = (config.emails || [])
+      .map(e => e.trim())
+      .filter(e => e.length > 0 && emailRegex.test(e));
 
     const credentials: AccountCredentials = {
-      apiKey: apiKey.value,
-      accountNumber: octopusAccountNumber.value,
-      email: emailString,
-      emails: emails,
+      apiKey: config.apiKey,
+      accountNumber: config.accountNumber,
+      nickname: config.nickname,
+      emails: validEmails,
     };
 
     console.log(`[SSM] Successfully fetched credentials for account ${accountNumber} (${credentials.accountNumber})`);
+    if (credentials.nickname) {
+      console.log(`[SSM] Nickname: ${credentials.nickname}`);
+    }
     if (credentials.emails.length > 0) {
       console.log(`[SSM] Email(s) configured: ${credentials.emails.join(', ')}`);
       console.log(`[SSM] Total recipients: ${credentials.emails.length}`);

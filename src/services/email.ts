@@ -55,6 +55,9 @@ async function generateQRCodePNG(barcodeValue: string): Promise<Buffer> {
  * @returns HTML email body
  */
 function createEmailHTML(voucher: VoucherInfo): string {
+  // Get display name (nickname or account number)
+  const displayName = voucher.nickname || voucher.accountNumber;
+
   const expiresText = voucher.expiresAt
     ? `<p><strong>Expires:</strong> ${new Date(voucher.expiresAt).toLocaleDateString('en-GB', {
         weekday: 'long',
@@ -77,6 +80,7 @@ function createEmailHTML(voucher: VoucherInfo): string {
 
     <div style="text-align: center; margin-bottom: 30px;">
       <h1 style="color: #1a1a1a; margin: 0 0 10px 0; font-size: 28px;">☕ Your Caffe Nero Voucher</h1>
+      <p style="color: #666; margin: 0 0 5px 0; font-size: 16px; font-weight: 500;">${displayName}</p>
       <p style="color: #666; margin: 0; font-size: 14px;">Weekly reward from Octopus Energy Octoplus</p>
     </div>
 
@@ -196,10 +200,14 @@ export async function sendVoucherEmail(recipientEmails: string | string[], vouch
     // Create email HTML
     const htmlBody = createEmailHTML(voucher);
 
+    // Create email subject with nickname or account number
+    const displayName = voucher.nickname || voucher.accountNumber;
+    const subject = `☕ Your Caffe Nero Voucher for ${displayName}`;
+
     // Create email options (use first recipient in To: header)
     const emailOptions: EmailOptions = {
       to: recipients[0],
-      subject: `☕ Your Caffe Nero Voucher - ${voucher.code}`,
+      subject,
       htmlBody,
       qrCodeBuffer,
       qrCodeFileName: `caffe-nero-qr-${voucher.code}.png`,
