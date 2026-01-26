@@ -68,29 +68,188 @@ functions:
     memorySize: 128
     logRetentionInDays: 14
     events:
-      # Account 1 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
+      # Account 1 Schedules
+      # Primary attempt: Monday 5:00-7:00 AM UTC (every 10 minutes)
       - schedule:
-          name: ${self:service}-${self:provider.stage}-account-1
-          description: "Claim Caffe Nero for Account 1 (Mon 5-6:30 AM UTC)"
+          name: ${self:service}-${self:provider.stage}-account-1-mon
+          description: "Claim Caffe Nero for Account 1 (Mon 5-7 AM UTC)"
           rate: cron(0/10 5-6 ? * MON *)
           enabled: true
           input:
             accountNumber: "1"
-
-      # Account 2 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
       - schedule:
-          name: ${self:service}-${self:provider.stage}-account-2
-          description: "Claim Caffe Nero for Account 2 (Mon 5-6:30 AM UTC)"
+          name: ${self:service}-${self:provider.stage}-account-1-mon-7
+          description: "Claim Caffe Nero for Account 1 (Mon 7 AM UTC)"
+          rate: cron(0 7 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      # Retry 1: Tuesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-tue
+          description: "Retry Caffe Nero for Account 1 (Tue 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-tue-7
+          description: "Retry Caffe Nero for Account 1 (Tue 7 AM UTC)"
+          rate: cron(0 7 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      # Retry 2: Wednesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-wed
+          description: "Retry Caffe Nero for Account 1 (Wed 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-wed-7
+          description: "Retry Caffe Nero for Account 1 (Wed 7 AM UTC)"
+          rate: cron(0 7 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      # Retry 3: Thursday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-thu
+          description: "Retry Caffe Nero for Account 1 (Thu 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * THU *)
+          enabled: true
+          input:
+            accountNumber: "1"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-1-thu-7
+          description: "Retry Caffe Nero for Account 1 (Thu 7 AM UTC)"
+          rate: cron(0 7 ? * THU *)
+          enabled: true
+          input:
+            accountNumber: "1"
+
+      # Account 2 Schedules
+      # Primary attempt: Monday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-mon
+          description: "Claim Caffe Nero for Account 2 (Mon 5-7 AM UTC)"
           rate: cron(0/10 5-6 ? * MON *)
           enabled: true
           input:
             accountNumber: "2"
-
-      # Account 3 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mondays
       - schedule:
-          name: ${self:service}-${self:provider.stage}-account-3
-          description: "Claim Caffe Nero for Account 3 (Mon 5-6:30 AM UTC)"
+          name: ${self:service}-${self:provider.stage}-account-2-mon-7
+          description: "Claim Caffe Nero for Account 2 (Mon 7 AM UTC)"
+          rate: cron(0 7 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      # Retry 1: Tuesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-tue
+          description: "Retry Caffe Nero for Account 2 (Tue 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-tue-7
+          description: "Retry Caffe Nero for Account 2 (Tue 7 AM UTC)"
+          rate: cron(0 7 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      # Retry 2: Wednesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-wed
+          description: "Retry Caffe Nero for Account 2 (Wed 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-wed-7
+          description: "Retry Caffe Nero for Account 2 (Wed 7 AM UTC)"
+          rate: cron(0 7 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      # Retry 3: Thursday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-thu
+          description: "Retry Caffe Nero for Account 2 (Thu 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * THU *)
+          enabled: true
+          input:
+            accountNumber: "2"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-2-thu-7
+          description: "Retry Caffe Nero for Account 2 (Thu 7 AM UTC)"
+          rate: cron(0 7 ? * THU *)
+          enabled: true
+          input:
+            accountNumber: "2"
+
+      # Account 3 Schedules
+      # Primary attempt: Monday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-mon
+          description: "Claim Caffe Nero for Account 3 (Mon 5-7 AM UTC)"
           rate: cron(0/10 5-6 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-mon-7
+          description: "Claim Caffe Nero for Account 3 (Mon 7 AM UTC)"
+          rate: cron(0 7 ? * MON *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      # Retry 1: Tuesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-tue
+          description: "Retry Caffe Nero for Account 3 (Tue 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-tue-7
+          description: "Retry Caffe Nero for Account 3 (Tue 7 AM UTC)"
+          rate: cron(0 7 ? * TUE *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      # Retry 2: Wednesday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-wed
+          description: "Retry Caffe Nero for Account 3 (Wed 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-wed-7
+          description: "Retry Caffe Nero for Account 3 (Wed 7 AM UTC)"
+          rate: cron(0 7 ? * WED *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      # Retry 3: Thursday 5:00-7:00 AM UTC (every 10 minutes)
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-thu
+          description: "Retry Caffe Nero for Account 3 (Thu 5-7 AM UTC)"
+          rate: cron(0/10 5-6 ? * THU *)
+          enabled: true
+          input:
+            accountNumber: "3"
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-account-3-thu-7
+          description: "Retry Caffe Nero for Account 3 (Thu 7 AM UTC)"
+          rate: cron(0 7 ? * THU *)
           enabled: true
           input:
             accountNumber: "3"
