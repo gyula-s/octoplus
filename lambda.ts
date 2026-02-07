@@ -81,7 +81,7 @@ export const handler = async (
       console.log(`⚠ No email configured for account ${event.accountNumber}`);
     }
 
-    // Step 2: Check DynamoDB state (for info only, not blocking)
+    // Step 2: Check DynamoDB state - skip entirely if already processed this week
     console.log('');
     console.log('-'.repeat(80));
     console.log('STEP 2: Check DynamoDB State');
@@ -90,14 +90,29 @@ export const handler = async (
     const skip = await shouldSkipAccount(credentials.accountNumber);
 
     if (skip) {
+      const endTime = new Date();
+      const executionTime = endTime.getTime() - startTime.getTime();
+
       console.log('');
-      console.log('ℹ️  NOTE: Account already processed this week');
+      console.log('✅ Account already processed this week - skipping');
       console.log('📅 State is fresh (after most recent Saturday 9 AM UTC)');
-      console.log('📧 Will still attempt to send email if voucher exists');
-      console.log('');
-    } else {
-      console.log('✓ State is stale or missing - proceeding with claim attempt');
+      console.log(`⏱️  Execution Time: ${executionTime}ms`);
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: 'Already processed this week',
+          accountNumber: credentials.accountNumber,
+          executionTime: `${executionTime}ms`,
+          timestamp: endTime.toISOString(),
+          requestId,
+        }, null, 2),
+      };
     }
+
+    console.log('✓ State is stale or missing - proceeding with claim attempt');
 
     // Step 3: Claim voucher from Octopus API (or fetch existing)
     console.log('');
