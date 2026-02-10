@@ -162,7 +162,8 @@ export async function shouldSkipAccount(accountNumber: string): Promise<boolean>
  *
  * Logic:
  * - If FORCE_EMAIL_SEND=true: Always send email
- * - If FORCE_EMAIL_SEND=false: Only send if voucher code changed (new voucher)
+ * - If FORCE_EMAIL_SEND=false: Only send if no email was sent this week
+ *   (after the Saturday 9 AM UTC reset boundary)
  *
  * @param accountNumber - Octopus account number
  * @param currentVoucherCode - Current voucher code to check
@@ -179,23 +180,36 @@ export async function shouldSendEmail(accountNumber: string, currentVoucherCode:
     return true;
   }
 
-  // Check if we already sent email for this voucher code
+  // Check existing state
   const state = await getAccountState(accountNumber);
 
   // No state means never sent - send it
-  if (!state || !state.voucherCode) {
-    console.log(`[State] ✓ No previous email record - will send email`);
+  if (!state) {
+    console.log(`[State] ✓ No previous state - will send email`);
     return true;
   }
 
-  // Compare voucher codes
-  if (state.voucherCode !== currentVoucherCode) {
-    console.log(`[State] ✓ Voucher code changed (${state.voucherCode} → ${currentVoucherCode}) - will send email`);
+  // If no email was ever sent for this voucher, send it
+  if (!state.emailSentAt) {
+    console.log(`[State] ✓ No email sent yet for voucher ${currentVoucherCode} - will send email`);
     return true;
   }
 
-  // Same voucher code - already sent email for this one
-  console.log(`[State] ✗ Email already sent for voucher code ${currentVoucherCode} - will skip email`);
+  // Check if email was sent this week (after the Saturday 9 AM reset boundary)
+  const resetBoundary = getMostRecentSaturdayAt9AM();
+  const emailSentDate = new Date(state.emailSentAt);
+
+  console.log(`[State] Checking email freshness for account ${accountNumber}:`);
+  console.log(`  Reset boundary: ${resetBoundary.toISOString()}`);
+  console.log(`  Last email:     ${emailSentDate.toISOString()}`);
+
+  if (emailSentDate < resetBoundary) {
+    console.log(`[State] ✓ Email was sent before reset boundary - new week, will send email`);
+    return true;
+  }
+
+  // Email was sent this week - skip
+  console.log(`[State] ✗ Email already sent this week for voucher code ${currentVoucherCode} - will skip email`);
   return false;
 }
 
@@ -220,11 +234,23 @@ export async function saveClaimState(
   // Calculate TTL (30 days from now, in seconds)
   const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
+  // When email wasn't sent this run, preserve the existing emailSentAt timestamp
+  let emailSentAt: number | undefined;
+  if (emailSent) {
+    emailSentAt = now;
+  } else {
+    const existingState = await getAccountState(accountNumber);
+    emailSentAt = existingState?.emailSentAt;
+    if (emailSentAt) {
+      console.log(`[State] Preserving existing emailSentAt: ${new Date(emailSentAt).toISOString()}`);
+    }
+  }
+
   const state: AccountState = {
     accountNumber,
     voucherCode,
     lastClaimedAt: now,
-    emailSentAt: emailSent ? now : undefined,
+    emailSentAt,
     ttl,
   };
 
