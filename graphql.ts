@@ -2,7 +2,7 @@ import { getToken } from './auth';
 import { OctopusAccount } from './accounts';
 
 // Constants
-const GRAPHQL_ENDPOINT = 'https://api.octopus.energy/v1/graphql/';
+const GRAPHQL_ENDPOINT = 'https://api.backend.octopus.energy/v1/graphql/';
 
 interface GraphQLVariables {
     [key: string]: any;
