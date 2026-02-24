@@ -1,15 +1,22 @@
 /**
  * AWS Lambda handler for Octoplus Caffe Nero voucher claiming
  *
- * This handler processes a single account per invocation.
- * Multiple EventBridge schedules trigger this function in parallel for different accounts.
+ * Flow:
+ * 1. Fetch credentials from SSM
+ * 2. Check DynamoDB state - if valid voucher exists, send email if needed, stop
+ * 3. Try to claim from Octopus API
+ *    - canClaim=true  -> claim, save state, send email
+ *    - OUT_OF_STOCK   -> stop (Lambda retries in 10 min)
+ *    - MAX_CLAIMS_PER_PERIOD_REACHED -> fetch existing voucher, validate expiry, save & email
+ *    - other          -> stop with error log
  */
 
-import { ScheduledEvent, ClaimResult } from './src/types';
+import { ScheduledEvent, AccountState, AccountCredentials, VoucherInfo } from './src/types';
 import { getAccountCredentials } from './src/services/parameters';
-import { shouldSkipAccount, shouldSendEmail, saveClaimState } from './src/services/state';
+import { getState, saveState, getNextSundayMidnight } from './src/services/state';
 import { sendVoucherEmail } from './src/services/email';
-import { manageCaffeNeroBenefitForAccount } from './index';
+import { checkCaffeNeroOffer, claimCaffeNero, fetchLatestCaffeNeroVoucher } from './index';
+import { OctopusAccount } from './accounts';
 
 interface LambdaContext {
   functionName: string;
@@ -26,254 +33,286 @@ interface LambdaResponse {
 }
 
 /**
+ * Mark state as emailSent=true and persist, then attempt to send the email.
+ * Saves state first to prevent duplicate emails if the Lambda crashes after sending.
+ * Returns the updated state.
+ */
+async function markSentAndEmail(
+  credentials: AccountCredentials,
+  voucher: VoucherInfo,
+  state: AccountState
+): Promise<AccountState> {
+  const updated = { ...state, emailSent: true };
+  await saveState(updated);
+
+  try {
+    const voucherWithNickname: VoucherInfo = {
+      ...voucher,
+      nickname: credentials.nickname,
+    };
+    console.log(`[Lambda] Sending email to ${credentials.emails.length} recipient(s)...`);
+    await sendVoucherEmail(credentials.emails, voucherWithNickname);
+    console.log(`[Lambda] Email sent successfully`);
+  } catch (emailError) {
+    console.error(`[Lambda] CRITICAL: Email send failed after state marked as sent. Manual check needed.`, emailError);
+  }
+
+  return updated;
+}
+
+/**
+ * Mark state as emailSent=true when no email recipients are configured.
+ * Returns the updated state.
+ */
+async function markSentNoEmail(state: AccountState): Promise<AccountState> {
+  console.log(`[Lambda] No email configured - marking as sent`);
+  const updated = { ...state, emailSent: true };
+  await saveState(updated);
+  return updated;
+}
+
+/**
+ * Build an AccountState object for a newly obtained voucher.
+ */
+function buildState(accountNumber: string, voucher: VoucherInfo): AccountState {
+  const now = Date.now();
+  const expiresAt = getNextSundayMidnight(now);
+  // TTL: 30 days from now (in seconds for DynamoDB)
+  const ttl = Math.floor(now / 1000) + 30 * 24 * 60 * 60;
+
+  return {
+    accountNumber,
+    voucherCode: voucher.code,
+    barcode: voucher.barcode,
+    expiresAt,
+    claimedAt: now,
+    emailSent: false,
+    ttl,
+  };
+}
+
+/**
  * Lambda handler entry point
- *
- * Processes a single Octopus Energy account:
- * 1. Fetch credentials from SSM Parameter Store
- * 2. Check DynamoDB state (skip if already processed this week)
- * 3. Call Octopus API to claim voucher
- * 4. Send email with QR code (if configured)
- * 5. Save state to DynamoDB
  */
 export const handler = async (
   event: ScheduledEvent,
   context: LambdaContext
 ): Promise<LambdaResponse> => {
-  const startTime = new Date();
+  const startTime = Date.now();
   const requestId = context.requestId;
 
   console.log('='.repeat(80));
-  console.log('🚀 LAMBDA START | Octoplus Caffe Nero Auto-Claimer');
+  console.log('LAMBDA START | Octoplus Caffe Nero Auto-Claimer');
   console.log('='.repeat(80));
-  console.log(`📋 Request ID:     ${requestId}`);
-  console.log(`🕐 Start Time:     ${startTime.toISOString()}`);
-  console.log(`⚙️  Function:       ${context.functionName} (v${context.functionVersion})`);
-  console.log(`⏱️  Timeout:        ${Math.floor(context.remainingTimeInMillis / 1000)}s remaining`);
-  console.log(`📦 Account Number: ${event.accountNumber}`);
+  console.log(`Request ID:     ${requestId}`);
+  console.log(`Start Time:     ${new Date(startTime).toISOString()}`);
+  console.log(`Account Number: ${event.accountNumber}`);
   console.log('='.repeat(80));
-  console.log('');
 
   try {
-    // Validate event input
     if (!event.accountNumber) {
       throw new Error('Missing accountNumber in event payload');
     }
 
-    console.log(`[Account ${event.accountNumber}] Starting processing...`);
-
-    // Step 1: Fetch credentials from SSM Parameter Store
-    console.log('');
-    console.log('-'.repeat(80));
-    console.log('STEP 1: Fetch Credentials from SSM Parameter Store');
-    console.log('-'.repeat(80));
-
+    // ── Step 1: Fetch credentials from SSM ──────────────────────────────
+    console.log('\n--- STEP 1: Fetch Credentials ---');
     const credentials = await getAccountCredentials(event.accountNumber);
+    const octopusAccountNumber = credentials.accountNumber;
+    console.log(`Credentials loaded for ${octopusAccountNumber}`);
 
-    console.log(`✓ Credentials loaded for account: ${credentials.accountNumber}`);
-    console.log(`✓ API Key: ${credentials.apiKey.substring(0, 12)}...`);
-    if (credentials.nickname) {
-      console.log(`✓ Nickname: ${credentials.nickname}`);
-    }
-    if (credentials.emails.length > 0) {
-      console.log(`✓ Email(s) configured: ${credentials.emails.join(', ')}`);
-      console.log(`✓ Total recipients: ${credentials.emails.length}`);
-    } else {
-      console.log(`⚠ No email configured for account ${event.accountNumber}`);
-    }
+    // ── Step 2: Check DynamoDB state ────────────────────────────────────
+    console.log('\n--- STEP 2: Check DynamoDB State ---');
+    const existingState = await getState(octopusAccountNumber);
+    const now = Date.now();
 
-    // Step 2: Check DynamoDB state - skip entirely if already processed this week
-    console.log('');
-    console.log('-'.repeat(80));
-    console.log('STEP 2: Check DynamoDB State');
-    console.log('-'.repeat(80));
+    if (existingState && existingState.expiresAt > now) {
+      // We have a valid (non-expired) voucher
+      console.log(`[Lambda] Valid voucher exists: ${existingState.voucherCode} (expires ${new Date(existingState.expiresAt).toISOString()})`);
 
-    const skip = await shouldSkipAccount(credentials.accountNumber);
-
-    if (skip) {
-      const endTime = new Date();
-      const executionTime = endTime.getTime() - startTime.getTime();
-
-      console.log('');
-      console.log('✅ Account already processed this week - skipping');
-      console.log('📅 State is fresh (after most recent Saturday 9 AM UTC)');
-      console.log(`⏱️  Execution Time: ${executionTime}ms`);
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
+      if (existingState.emailSent) {
+        console.log(`[Lambda] Email already sent - nothing to do`);
+        return respond(200, {
           success: true,
-          skipped: true,
-          reason: 'Already processed this week',
-          accountNumber: credentials.accountNumber,
-          executionTime: `${executionTime}ms`,
-          timestamp: endTime.toISOString(),
-          requestId,
-        }, null, 2),
-      };
-    }
-
-    console.log('✓ State is stale or missing - proceeding with claim attempt');
-
-    // Step 3: Claim voucher from Octopus API (or fetch existing)
-    console.log('');
-    console.log('-'.repeat(80));
-    console.log('STEP 3: Fetch Caffe Nero Voucher from Octopus API');
-    console.log('-'.repeat(80));
-
-    const claimResult: ClaimResult = await manageCaffeNeroBenefitForAccount(
-      credentials.apiKey,
-      credentials.accountNumber
-    );
-
-    // Check if we got voucher details (either newly claimed or already claimed)
-    if (!claimResult.voucher) {
-      console.log('');
-      console.log(`❌ No voucher available: ${claimResult.error || 'Unknown error'}`);
-
-      const endTime = new Date();
-      const executionTime = endTime.getTime() - startTime.getTime();
-
-      return {
-        statusCode: 200, // Still return 200 (not Lambda failure, just no voucher)
-        body: JSON.stringify({
-          success: false,
-          error: claimResult.error,
-          alreadyClaimed: claimResult.alreadyClaimed,
-          accountNumber: credentials.accountNumber,
-          executionTime: `${executionTime}ms`,
-          timestamp: endTime.toISOString(),
-        }, null, 2),
-      };
-    }
-
-    // We have voucher details - either newly claimed or already claimed
-    if (claimResult.success) {
-      console.log('✓ Voucher claimed successfully!');
-    } else if (claimResult.alreadyClaimed) {
-      console.log('✓ Voucher already claimed (sending email with existing voucher)');
-    }
-
-    console.log(`  Code: ${claimResult.voucher.code}`);
-    console.log(`  Barcode: ${claimResult.voucher.barcode}`);
-    if (claimResult.voucher.expiresAt) {
-      console.log(`  Expires: ${new Date(claimResult.voucher.expiresAt).toLocaleDateString()}`);
-    }
-
-    // Step 4: Send email with QR code (if configured and needed)
-    let emailSent = false;
-
-    console.log('');
-    console.log('-'.repeat(80));
-    console.log('STEP 4: Check Email Sending');
-    console.log('-'.repeat(80));
-
-    if (credentials.emails.length === 0) {
-      console.log('⏭️  Skipping email (no email address configured)');
-    } else if (!claimResult.voucher) {
-      console.log('⏭️  Skipping email (no voucher available)');
-    } else {
-      // Check if we should send email based on FORCE_EMAIL_SEND setting
-      const shouldSend = await shouldSendEmail(
-        credentials.accountNumber,
-        claimResult.voucher.code
-      );
-
-      if (shouldSend) {
-        console.log(`📧 Sending email with QR code to ${credentials.emails.length} recipient(s)...`);
-        try {
-          // Add nickname to voucher info for email personalization
-          const voucherWithNickname = {
-            ...claimResult.voucher,
-            nickname: credentials.nickname,
-          };
-          await sendVoucherEmail(credentials.emails, voucherWithNickname);
-          emailSent = true;
-          console.log(`✓ Email sent successfully to: ${credentials.emails.join(', ')}`);
-        } catch (emailError) {
-          console.error('❌ Failed to send email (continuing anyway):', emailError);
-          emailSent = false;
-        }
-      } else {
-        console.log('⏭️  Skipping email (already sent for this voucher code)');
+          action: 'none',
+          reason: 'Valid voucher exists and email already sent',
+          accountNumber: octopusAccountNumber,
+          voucherCode: existingState.voucherCode,
+        }, startTime, requestId);
       }
+
+      // Email not sent yet - send it now
+      if (credentials.emails.length > 0) {
+        const voucher: VoucherInfo = {
+          code: existingState.voucherCode,
+          barcode: existingState.barcode,
+          accountNumber: octopusAccountNumber,
+        };
+        await markSentAndEmail(credentials, voucher, existingState);
+      } else {
+        await markSentNoEmail(existingState);
+      }
+
+      return respond(200, {
+        success: true,
+        action: 'email_sent',
+        accountNumber: octopusAccountNumber,
+        voucherCode: existingState.voucherCode,
+      }, startTime, requestId);
     }
 
-    // Step 5: Save state to DynamoDB
-    console.log('');
-    console.log('-'.repeat(80));
-    console.log('STEP 5: Save State to DynamoDB');
-    console.log('-'.repeat(80));
+    // No valid voucher - need to claim
+    console.log(`[Lambda] No valid voucher in DynamoDB - proceeding to claim`);
 
-    await saveClaimState(
-      credentials.accountNumber,
-      claimResult.voucher?.code || 'UNKNOWN',
-      emailSent
-    );
-
-    console.log('✓ State saved successfully');
-
-    // Success summary
-    const endTime = new Date();
-    const executionTime = endTime.getTime() - startTime.getTime();
-
-    console.log('');
-    console.log('='.repeat(80));
-    console.log('✅ SUCCESS | Lambda execution completed');
-    console.log('='.repeat(80));
-    console.log(`⏱️  Execution Time: ${executionTime}ms`);
-    console.log(`🕐 End Time:       ${endTime.toISOString()}`);
-    console.log(`📋 Request ID:     ${requestId}`);
-    console.log(`📧 Email Sent:     ${emailSent ? 'Yes' : 'No'}`);
-    console.log('='.repeat(80));
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        accountNumber: credentials.accountNumber,
-        voucherCode: claimResult.voucher?.code,
-        emailSent,
-        executionTime: `${executionTime}ms`,
-        timestamp: endTime.toISOString(),
-        requestId,
-      }, null, 2),
+    // ── Step 3: Try to claim ────────────────────────────────────────────
+    console.log('\n--- STEP 3: Claim from Octopus API ---');
+    const account: OctopusAccount = {
+      name: octopusAccountNumber,
+      apiKey: credentials.apiKey,
+      accountNumber: octopusAccountNumber,
     };
 
+    const offerStatus = await checkCaffeNeroOffer(account);
+
+    if (!offerStatus.found) {
+      console.log(`[Lambda] Caffe Nero offer not found in benefits list`);
+      return respond(200, {
+        success: false,
+        action: 'offer_not_found',
+        accountNumber: octopusAccountNumber,
+      }, startTime, requestId);
+    }
+
+    if (offerStatus.canClaim) {
+      // ── Claim it ──────────────────────────────────────────────────
+      console.log(`[Lambda] Offer is claimable - claiming...`);
+      const claimResult = await claimCaffeNero(account);
+      const voucher = claimResult.voucher;
+
+      console.log(`[Lambda] Claimed voucher: ${voucher.code}`);
+
+      // Save state then send email
+      let state = buildState(octopusAccountNumber, voucher);
+      if (credentials.emails.length > 0) {
+        state = await markSentAndEmail(credentials, voucher, state);
+      } else {
+        state = await markSentNoEmail(state);
+      }
+
+      return respond(200, {
+        success: true,
+        action: 'claimed',
+        accountNumber: octopusAccountNumber,
+        voucherCode: voucher.code,
+        emailSent: state.emailSent,
+      }, startTime, requestId);
+    }
+
+    // ── Cannot claim - check reason ─────────────────────────────────
+    const reason = offerStatus.cannotClaimReason || 'UNKNOWN';
+    console.log(`[Lambda] Cannot claim. Reason: ${reason}`);
+
+    if (reason === 'OUT_OF_STOCK') {
+      console.log(`[Lambda] OUT_OF_STOCK - will retry on next schedule`);
+      return respond(200, {
+        success: false,
+        action: 'out_of_stock',
+        accountNumber: octopusAccountNumber,
+      }, startTime, requestId);
+    }
+
+    if (reason === 'MAX_CLAIMS_PER_PERIOD_REACHED') {
+      // Already claimed on Octopus but not tracked in our DynamoDB
+      console.log(`[Lambda] MAX_CLAIMS - fetching existing voucher...`);
+      const fetched = await fetchLatestCaffeNeroVoucher(account);
+
+      if (!fetched.voucher) {
+        console.log(`[Lambda] No voucher found from API`);
+        return respond(200, {
+          success: false,
+          action: 'max_claims_no_voucher',
+          accountNumber: octopusAccountNumber,
+        }, startTime, requestId);
+      }
+
+      // Validate expiry - never use an expired voucher
+      const voucherExpiresAt = fetched.voucher.expiresAt
+        ? new Date(fetched.voucher.expiresAt).getTime()
+        : 0;
+
+      if (voucherExpiresAt <= now) {
+        console.log(`[Lambda] Fetched voucher is expired (${fetched.voucher.expiresAt}) - discarding`);
+        return respond(200, {
+          success: false,
+          action: 'voucher_expired',
+          accountNumber: octopusAccountNumber,
+        }, startTime, requestId);
+      }
+
+      console.log(`[Lambda] Valid existing voucher: ${fetched.voucher.code} (expires ${fetched.voucher.expiresAt})`);
+
+      // Save state then send email
+      let state = buildState(octopusAccountNumber, fetched.voucher);
+      if (credentials.emails.length > 0) {
+        state = await markSentAndEmail(credentials, fetched.voucher, state);
+      } else {
+        state = await markSentNoEmail(state);
+      }
+
+      return respond(200, {
+        success: true,
+        action: 'recovered_existing',
+        accountNumber: octopusAccountNumber,
+        voucherCode: fetched.voucher.code,
+        emailSent: state.emailSent,
+      }, startTime, requestId);
+    }
+
+    // Unknown reason
+    console.error(`[Lambda] Unexpected cannotClaimReason: ${reason}`);
+    return respond(200, {
+      success: false,
+      action: 'cannot_claim',
+      reason,
+      accountNumber: octopusAccountNumber,
+    }, startTime, requestId);
+
   } catch (error) {
-    const errorTime = new Date();
-    const executionTime = errorTime.getTime() - startTime.getTime();
-
-    console.error('');
-    console.error('='.repeat(80));
-    console.error('❌ FAILURE | Lambda execution failed');
-    console.error('='.repeat(80));
-    console.error(`🕐 Error Time:     ${errorTime.toISOString()}`);
-    console.error(`⏱️  Execution Time: ${executionTime}ms`);
-    console.error(`📋 Request ID:     ${requestId}`);
-    console.error('='.repeat(80));
-
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    console.error(`📝 Error Message:`, errorMessage);
-    if (errorStack) {
-      console.error('📋 Stack Trace:');
-      console.error(errorStack);
-    }
+    console.error(`[Lambda] FAILURE: ${errorMessage}`);
+    if (errorStack) console.error(errorStack);
 
-    console.error('='.repeat(80));
-
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        success: false,
-        error: errorMessage,
-        stack: errorStack,
-        accountNumber: event.accountNumber,
-        executionTime: `${executionTime}ms`,
-        timestamp: errorTime.toISOString(),
-        requestId,
-      }, null, 2),
-    };
+    return respond(500, {
+      success: false,
+      error: errorMessage,
+      accountNumber: event.accountNumber,
+    }, startTime, requestId);
   }
 };
+
+function respond(
+  statusCode: number,
+  data: Record<string, unknown>,
+  startTime: number,
+  requestId: string
+): LambdaResponse {
+  const executionTime = Date.now() - startTime;
+  const body = {
+    ...data,
+    executionTime: `${executionTime}ms`,
+    timestamp: new Date().toISOString(),
+    requestId,
+  };
+
+  console.log('');
+  console.log('='.repeat(80));
+  console.log(`LAMBDA END | ${statusCode === 200 ? 'SUCCESS' : 'FAILURE'} | ${executionTime}ms`);
+  console.log(JSON.stringify(body, null, 2));
+  console.log('='.repeat(80));
+
+  return {
+    statusCode,
+    body: JSON.stringify(body, null, 2),
+  };
+}

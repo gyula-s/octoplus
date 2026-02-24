@@ -3,226 +3,142 @@ import { getBenefitsList, BenefitsResponse } from './queries/octoplusBenefits';
 import { claimBenefit, ClaimRewardResponse } from './queries/claimBenefit';
 import { getAllClaimedOffers, ClaimedOfferResponse } from './queries/getClaimedOffer';
 import { loadOctopusAccounts, validateAccounts, OctopusAccount } from './accounts';
+import { VoucherInfo } from './src/types';
 
-async function getClaimedOfferBySlug(account: OctopusAccount, offerSlug: string) {
-    try {
-        // Get all claimed offers and filter by slug
-        const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
+// ============================================================================
+// Result types returned by the API functions
+// ============================================================================
 
-        console.log('Successfully fetched all claimed offers, searching for:', offerSlug);
-        
-        // Find the specific offer by slug
-        const matchingReward = allClaimedOffers.octoplusRewards.find(
-            reward => reward.offer.slug === offerSlug
-        );
-
-        if (matchingReward) {
-            console.log(`Found offer: ${matchingReward.offer.name}`);
-            console.log(`Status: ${matchingReward.status}`);
-            
-            if (matchingReward.vouchers.length > 0) {
-                const voucher = matchingReward.vouchers[0];
-                console.log(`Voucher Code: ${voucher.code}`);
-                console.log(`Barcode Value: ${voucher.barcodeValue}`);
-                console.log(`Barcode Format: ${voucher.barcodeFormat}`);
-                console.log(`Expires At: ${voucher.expiresAt}`);
-                console.log('Usage Instructions:', matchingReward.offer.usageInstructions);
-            }
-        } else {
-            console.log(`No claimed offer found with slug: ${offerSlug}`);
-            console.log('Available claimed offers:');
-            allClaimedOffers.octoplusRewards.forEach(reward => {
-                console.log(`- ${reward.offer.slug}: ${reward.offer.name}`);
-            });
-        }
-
-    } catch (error) {
-        console.error('Failed to get claimed offer by slug:', error);
-    }
+export interface OfferStatus {
+    found: boolean;
+    canClaim: boolean;
+    cannotClaimReason?: string | null;
 }
 
+export interface ClaimSuccess {
+    voucher: VoucherInfo;
+}
+
+export interface FetchedVoucher {
+    voucher: VoucherInfo | null;
+}
+
+// ============================================================================
+// API functions - pure Octopus API interactions, no state/email logic
+// ============================================================================
+
 /**
- * Manage Caffe Nero benefit for a single account
- *
- * @param apiKey - Octopus Energy API key
- * @param accountNumber - Octopus Energy account number
- * @returns ClaimResult indicating success/failure and voucher details
+ * Check if the Caffe Nero offer exists and whether it can be claimed.
  */
-export async function manageCaffeNeroBenefitForAccount(apiKey: string, accountNumber: string): Promise<import('./src/types').ClaimResult> {
-    const targetSlug = 'caffe-nero';
+export async function checkCaffeNeroOffer(account: OctopusAccount): Promise<OfferStatus> {
+    const benefitsData: BenefitsResponse = await executeGraphQLQuery(account, getBenefitsList);
 
-    // Create account object for GraphQL queries
-    const account: OctopusAccount = {
-        name: accountNumber,
-        apiKey,
-        accountNumber
-    };
-
-    try {
-        console.log(`🔍 Checking Caffe Nero benefit status for ${accountNumber}...\n`);
-
-        // Step 1: Get available benefits
-        console.log('1️⃣ Fetching available benefits...');
-        const benefitsData: BenefitsResponse = await executeGraphQLQuery(account, getBenefitsList);
-
-        // Find Caffe Nero in the benefits list
-        let caffeNeroOffer = null;
-        for (const edge of benefitsData.octoplusOfferGroups.edges) {
-            caffeNeroOffer = edge.node.octoplusOffers.find(offer => offer.slug === targetSlug);
-            if (caffeNeroOffer) break;
-        }
-
-        if (!caffeNeroOffer) {
-            console.log('❌ Caffe Nero offer not found in available benefits');
+    for (const edge of benefitsData.octoplusOfferGroups.edges) {
+        const offer = edge.node.octoplusOffers.find(o => o.slug === 'caffe-nero');
+        if (offer) {
             return {
-                success: false,
-                error: 'Caffe Nero offer not found in available benefits'
+                found: true,
+                canClaim: offer.claimAbility.canClaimOffer,
+                cannotClaimReason: offer.claimAbility.cannotClaimReason,
             };
         }
-
-        console.log(`📋 Found: ${caffeNeroOffer.name}`);
-        console.log(`🎯 Can claim: ${caffeNeroOffer.claimAbility.canClaimOffer}`);
-        if (!caffeNeroOffer.claimAbility.canClaimOffer) {
-            console.log(`🚫 Reason: ${caffeNeroOffer.claimAbility.cannotClaimReason}`);
-        }
-        console.log('');
-
-        // Step 2: Check if claimable and claim it
-        if (caffeNeroOffer.claimAbility.canClaimOffer) {
-            console.log('2️⃣ Benefit is claimable! Attempting to claim...');
-
-            const claimResponse: ClaimRewardResponse = await executeGraphQLQuery(
-                account,
-                claimBenefit,
-                { offerSlug: targetSlug }
-            );
-
-            console.log(`✅ Successfully claimed! Reward ID: ${claimResponse.claimOctoplusReward.rewardId}`);
-            console.log('');
-
-            // Get the voucher details for the newly claimed benefit
-            console.log('3️⃣ Fetching voucher details...');
-            const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
-
-            const newClaim = allClaimedOffers.octoplusRewards.find(
-                reward => reward.offer.slug === targetSlug
-            );
-
-            if (newClaim && newClaim.vouchers.length > 0) {
-                const voucher = newClaim.vouchers[0];
-                console.log(`🎫 Voucher Code: ${voucher.code}`);
-                console.log(`📱 Barcode Value: ${voucher.barcodeValue}`);
-                console.log(`⏰ Expires At: ${voucher.expiresAt}`);
-
-                return {
-                    success: true,
-                    voucher: {
-                        code: voucher.code,
-                        barcode: voucher.barcodeValue,
-                        expiresAt: voucher.expiresAt,
-                        accountNumber
-                    }
-                };
-            } else {
-                return {
-                    success: false,
-                    error: 'Claimed successfully but could not retrieve voucher details'
-                };
-            }
-
-        } else {
-            // Step 3: Check if already claimed
-            console.log('2️⃣ Benefit not claimable. Checking if already claimed...');
-
-            const allClaimedOffers: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
-
-            const existingClaim = allClaimedOffers.octoplusRewards.find(
-                reward => reward.offer.slug === targetSlug
-            );
-
-            if (existingClaim) {
-                console.log('✅ Found existing claim! Here are your voucher details:');
-                console.log('');
-                console.log(`🏪 Offer: ${existingClaim.offer.name}`);
-                console.log(`📊 Status: ${existingClaim.status}`);
-
-                if (existingClaim.vouchers.length > 0) {
-                    const voucher = existingClaim.vouchers[0];
-                    console.log(`🎫 Voucher Code: ${voucher.code}`);
-                    console.log(`📱 Barcode Value: ${voucher.barcodeValue}`);
-                    console.log(`🔢 Barcode Format: ${voucher.barcodeFormat}`);
-                    console.log(`⏰ Expires At: ${voucher.expiresAt}`);
-
-                    return {
-                        success: false,
-                        alreadyClaimed: true,
-                        error: 'Voucher already claimed this week',
-                        voucher: {
-                            code: voucher.code,
-                            barcode: voucher.barcodeValue,
-                            expiresAt: voucher.expiresAt,
-                            accountNumber
-                        }
-                    };
-                } else {
-                    return {
-                        success: false,
-                        alreadyClaimed: true,
-                        error: 'Voucher already claimed but no voucher details available'
-                    };
-                }
-            } else {
-                console.log('❌ Caffe Nero benefit is not claimable and you haven\'t claimed it yet.');
-                console.log('💡 Reason: ' + caffeNeroOffer.claimAbility.cannotClaimReason);
-
-                return {
-                    success: false,
-                    error: caffeNeroOffer.claimAbility.cannotClaimReason || 'Benefit not claimable'
-                };
-            }
-        }
-
-    } catch (error) {
-        console.error(`❌ Error managing Caffe Nero benefit for ${accountNumber}:`, error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return {
-            success: false,
-            error: errorMessage
-        };
     }
+
+    return { found: false, canClaim: false };
 }
 
 /**
- * Main function that processes Caffe Nero benefits for all configured accounts
+ * Claim the Caffe Nero offer and return the voucher details.
+ * Only call this when checkCaffeNeroOffer reports canClaim === true.
  */
+export async function claimCaffeNero(account: OctopusAccount): Promise<ClaimSuccess> {
+    const claimResponse: ClaimRewardResponse = await executeGraphQLQuery(
+        account,
+        claimBenefit,
+        { offerSlug: 'caffe-nero' }
+    );
+    console.log(`[API] Claimed reward ID: ${claimResponse.claimOctoplusReward.rewardId}`);
+
+    const allClaimed: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
+    const reward = allClaimed.octoplusRewards.find(r => r.offer.slug === 'caffe-nero');
+
+    if (!reward || reward.vouchers.length === 0) {
+        throw new Error('Claimed successfully but could not retrieve voucher details');
+    }
+
+    const voucher = reward.vouchers[0];
+    return {
+        voucher: {
+            code: voucher.code,
+            barcode: voucher.barcodeValue,
+            expiresAt: voucher.expiresAt,
+            accountNumber: account.accountNumber,
+        },
+    };
+}
+
+/**
+ * Fetch the latest Caffe Nero voucher from already-claimed rewards.
+ * Returns null if no voucher is found.
+ */
+export async function fetchLatestCaffeNeroVoucher(account: OctopusAccount): Promise<FetchedVoucher> {
+    const allClaimed: ClaimedOfferResponse = await executeGraphQLQuery(account, getAllClaimedOffers);
+    const reward = allClaimed.octoplusRewards.find(r => r.offer.slug === 'caffe-nero');
+
+    if (!reward || reward.vouchers.length === 0) {
+        return { voucher: null };
+    }
+
+    const voucher = reward.vouchers[0];
+    return {
+        voucher: {
+            code: voucher.code,
+            barcode: voucher.barcodeValue,
+            expiresAt: voucher.expiresAt,
+            accountNumber: account.accountNumber,
+        },
+    };
+}
+
+// ============================================================================
+// Legacy standalone entry point (for local testing only)
+// ============================================================================
+
 export async function manageCaffeNeroBenefit() {
     try {
-        // Load and validate all configured accounts
         const accounts = loadOctopusAccounts();
         validateAccounts(accounts);
-        
-        console.log(`🚀 Starting Caffe Nero benefit processing for ${accounts.length} account(s)...\n`);
-        
-        // Process each account sequentially
+
+        console.log(`Starting Caffe Nero benefit processing for ${accounts.length} account(s)...\n`);
+
         for (let i = 0; i < accounts.length; i++) {
             const account = accounts[i];
-            
-            console.log(`📋 Processing ${account.name} (${i + 1}/${accounts.length})`);
-            console.log(`🔑 Account: ${account.accountNumber}`);
-            console.log('─'.repeat(50));
-            
-            await manageCaffeNeroBenefitForAccount(account.apiKey, account.accountNumber);
-            
-            // Add separator between accounts (except for the last one)
+            console.log(`Processing ${account.name} (${i + 1}/${accounts.length})`);
+
+            const status = await checkCaffeNeroOffer(account);
+            if (!status.found) {
+                console.log('Caffe Nero offer not found');
+                continue;
+            }
+            if (status.canClaim) {
+                const result = await claimCaffeNero(account);
+                console.log(`Claimed: ${result.voucher.code}`);
+            } else {
+                console.log(`Cannot claim: ${status.cannotClaimReason}`);
+                const fetched = await fetchLatestCaffeNeroVoucher(account);
+                if (fetched.voucher) {
+                    console.log(`Existing voucher: ${fetched.voucher.code} (expires ${fetched.voucher.expiresAt})`);
+                }
+            }
+
             if (i < accounts.length - 1) {
-                console.log('\n' + '═'.repeat(60) + '\n');
+                console.log('\n' + '='.repeat(60) + '\n');
             }
         }
-        
-        console.log(`\n🎉 Completed processing all ${accounts.length} account(s)!`);
-        
+
+        console.log(`\nCompleted processing all ${accounts.length} account(s)!`);
     } catch (error) {
-        console.error('❌ Error in multi-account processing:', error);
+        console.error('Error in multi-account processing:', error);
         throw error;
     }
 }

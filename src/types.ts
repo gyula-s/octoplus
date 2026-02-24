@@ -41,14 +41,18 @@ export interface AccountCredentials {
 export interface AccountState {
   /** Partition key: Octopus account number */
   accountNumber: string;
-  /** Last claimed voucher code */
-  voucherCode?: string;
-  /** Timestamp when email was sent (Unix milliseconds) */
-  emailSentAt?: number;
-  /** Timestamp when voucher was last claimed (Unix milliseconds) */
-  lastClaimedAt?: number;
-  /** TTL for automatic cleanup (Unix seconds) */
-  ttl?: number;
+  /** Current week's voucher code */
+  voucherCode: string;
+  /** Barcode value for QR code generation */
+  barcode: string;
+  /** Unix ms - when this voucher expires (always next Sunday midnight UTC) */
+  expiresAt: number;
+  /** Unix ms - when the voucher was claimed from Octopus */
+  claimedAt: number;
+  /** Whether email was sent for this voucher code */
+  emailSent: boolean;
+  /** TTL for automatic DynamoDB cleanup (Unix seconds) */
+  ttl: number;
 }
 
 // ============================================================================
@@ -90,52 +94,6 @@ export interface VoucherInfo {
 // ============================================================================
 // Octopus API
 // ============================================================================
-
-/**
- * Result of attempting to claim a voucher
- */
-export interface ClaimResult {
-  /** Whether the claim was successful */
-  success: boolean;
-  /** Voucher information if successful */
-  voucher?: VoucherInfo;
-  /** Error message if unsuccessful */
-  error?: string;
-  /** Whether the voucher was already claimed */
-  alreadyClaimed?: boolean;
-}
-
-/**
- * Partner offer group from Octopus API
- */
-export interface PartnerOfferGroup {
-  __typename: string;
-  title: string;
-  slug: string;
-  offers: PartnerOffer[];
-}
-
-/**
- * Individual partner offer
- */
-export interface PartnerOffer {
-  __typename: string;
-  title: string;
-  slug: string;
-  description?: string;
-}
-
-/**
- * Claimed Octoplus reward
- */
-export interface OctoplusReward {
-  __typename: string;
-  partnerOfferSlug: string;
-  voucherCode?: string;
-  barcode?: string;
-  expiresAt?: string;
-  claimedAt?: string;
-}
 
 /**
  * Kraken token for API authentication
