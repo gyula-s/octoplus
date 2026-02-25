@@ -211,21 +211,23 @@ export const handler = async (
     const reason = offerStatus.cannotClaimReason || 'UNKNOWN';
     console.log(`[Lambda] Cannot claim. Reason: ${reason}`);
 
-    if (reason === 'OUT_OF_STOCK') {
-      console.log(`[Lambda] OUT_OF_STOCK - will retry on next schedule`);
-      return respond(200, {
-        success: false,
-        action: 'out_of_stock',
-        accountNumber: octopusAccountNumber,
-      }, startTime, requestId);
-    }
-
-    if (reason === 'MAX_CLAIMS_PER_PERIOD_REACHED') {
-      // Already claimed on Octopus but not tracked in our DynamoDB
-      console.log(`[Lambda] MAX_CLAIMS - fetching existing voucher...`);
+    if (reason === 'OUT_OF_STOCK' || reason === 'MAX_CLAIMS_PER_PERIOD_REACHED') {
+      // Both cases: check if there's an existing voucher we can recover.
+      // OUT_OF_STOCK may be returned even when the user already claimed
+      // (the API doesn't distinguish "you claimed + it's out" from "just out").
+      // MAX_CLAIMS means definitely claimed on Octopus but not in our DynamoDB.
+      console.log(`[Lambda] ${reason} - checking for existing voucher...`);
       const fetched = await fetchLatestCaffeNeroVoucher(account);
 
       if (!fetched.voucher) {
+        if (reason === 'OUT_OF_STOCK') {
+          console.log(`[Lambda] No existing voucher found - will retry on next schedule`);
+          return respond(200, {
+            success: false,
+            action: 'out_of_stock',
+            accountNumber: octopusAccountNumber,
+          }, startTime, requestId);
+        }
         console.log(`[Lambda] No voucher found from API`);
         return respond(200, {
           success: false,
@@ -241,6 +243,13 @@ export const handler = async (
 
       if (voucherExpiresAt <= now) {
         console.log(`[Lambda] Fetched voucher is expired (${fetched.voucher.expiresAt}) - discarding`);
+        if (reason === 'OUT_OF_STOCK') {
+          return respond(200, {
+            success: false,
+            action: 'out_of_stock',
+            accountNumber: octopusAccountNumber,
+          }, startTime, requestId);
+        }
         return respond(200, {
           success: false,
           action: 'voucher_expired',

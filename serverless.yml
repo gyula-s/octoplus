@@ -68,29 +68,29 @@ functions:
     memorySize: 128
     logRetentionInDays: 14
     events:
-      # Account 1 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon/Tue/Wed
+      # Account 1 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon-Thu
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-1
-          description: "Claim Caffe Nero for Account 1 (Mon-Wed 5-6:30 AM UTC)"
-          rate: cron(0/10 5-6 ? * MON,TUE,WED *)
+          description: "Claim Caffe Nero for Account 1 (Mon-Thu 5-6:30 AM UTC)"
+          rate: cron(0/10 5-6 ? * MON,TUE,WED,THU *)
           enabled: true
           input:
             accountNumber: "1"
 
-      # Account 2 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon/Tue/Wed
+      # Account 2 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon-Thu
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-2
-          description: "Claim Caffe Nero for Account 2 (Mon-Wed 5-6:30 AM UTC)"
-          rate: cron(0/10 5-6 ? * MON,TUE,WED *)
+          description: "Claim Caffe Nero for Account 2 (Mon-Thu 5-6:30 AM UTC)"
+          rate: cron(0/10 5-6 ? * MON,TUE,WED,THU *)
           enabled: true
           input:
             accountNumber: "2"
 
-      # Account 3 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon/Tue/Wed
+      # Account 3 Schedule - Runs every 10 minutes between 5:00-6:30 AM UTC on Mon-Thu
       - schedule:
           name: ${self:service}-${self:provider.stage}-account-3
-          description: "Claim Caffe Nero for Account 3 (Mon-Wed 5-6:30 AM UTC)"
-          rate: cron(0/10 5-6 ? * MON,TUE,WED *)
+          description: "Claim Caffe Nero for Account 3 (Mon-Thu 5-6:30 AM UTC)"
+          rate: cron(0/10 5-6 ? * MON,TUE,WED,THU *)
           enabled: true
           input:
             accountNumber: "3"
