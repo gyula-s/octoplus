@@ -75,6 +75,13 @@ export async function getState(accountNumber: string): Promise<AccountState | un
     }
 
     const state = response.Item as AccountState;
+
+    // Old-schema records lack expiresAt — treat them as stale
+    if (!state.expiresAt) {
+      console.log(`[State] Found legacy state for account ${accountNumber} (no expiresAt) - treating as stale`);
+      return undefined;
+    }
+
     console.log(`[State] Found state for account ${accountNumber}:`, {
       voucherCode: state.voucherCode,
       expiresAt: new Date(state.expiresAt).toISOString(),
