@@ -64,6 +64,7 @@ function createEmailHTML(voucher: VoucherInfo): string {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'UTC',
       })}</p>`
     : '';
 
