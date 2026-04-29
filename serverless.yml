@@ -5,7 +5,7 @@ custom:
 
 provider:
   name: aws
-  runtime: nodejs20.x  # Latest LTS version supported by AWS Lambda
+  runtime: nodejs24.x
   region: eu-west-1  # Ireland region - change if needed
   stage: ${opt:stage, 'dev'}  # Default to 'dev' stage
   timeout: 30
